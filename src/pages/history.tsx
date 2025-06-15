@@ -42,24 +42,43 @@ const History = () => {
       
       setLoading(true);
       try {
-        const query = `
-          SELECT 
-            ch.id, ch.calculatedValue, ch.calculatedAt, ch.notes,
-            ch.operationId, ch.hospitalId,
-            o.name as operationName, o.code as operationCode,
-            h.name as hospitalName
-          FROM calculationHistory ch
-          JOIN operations o ON ch.operationId = o.id
-          JOIN hospitals h ON ch.hospitalId = h.id
-          WHERE ch.userId = ?
-          ORDER BY ch.calculatedAt DESC
-        `;
+        // Get calculation history
+        const historyData = await fine.table("calculationHistory")
+          .select("*")
+          .eq("userId", session.user.id)
+          .order("calculatedAt", { ascending: false });
         
-        const data = await fine.execute(query, [session.user.id]);
-        
-        if (data) {
-          setCalculations(data);
-          setFilteredCalculations(data);
+        if (historyData && historyData.length > 0) {
+          // Get operations
+          const operationIds = historyData.map(h => h.operationId);
+          const operations = await fine.table("operations")
+            .select("id, name, code")
+            .in("id", operationIds);
+          
+          // Get hospitals
+          const hospitalIds = historyData.map(h => h.hospitalId);
+          const hospitals = await fine.table("hospitals")
+            .select("id, name")
+            .in("id", hospitalIds);
+          
+          // Map the data
+          const mappedData = historyData.map(calc => {
+            const operation = operations?.find(o => o.id === calc.operationId);
+            const hospital = hospitals?.find(h => h.id === calc.hospitalId);
+            
+            return {
+              ...calc,
+              operationName: operation?.name || "Unknown Operation",
+              operationCode: operation?.code || null,
+              hospitalName: hospital?.name || "Unknown Hospital"
+            };
+          });
+          
+          setCalculations(mappedData);
+          setFilteredCalculations(mappedData);
+        } else {
+          setCalculations([]);
+          setFilteredCalculations([]);
         }
       } catch (error) {
         console.error("Failed to fetch calculation history:", error);
@@ -253,6 +272,6 @@ const History = () => {
       </div>
     </AppLayout>
   );
-};
+}
 
 export default History;

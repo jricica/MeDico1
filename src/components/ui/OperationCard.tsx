@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { fine } from "@/lib/fine";
 import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import type { Schema } from "@/lib/db-types";
 
 interface OperationCardProps {

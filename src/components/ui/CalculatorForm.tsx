@@ -33,18 +33,23 @@ export function CalculatorForm() {
       
       setLoading(true);
       try {
-        const query = `
-          SELECT 
-            o.id, o.name, o.code, o.specialtyId, o.basePoints, 
-            o.description, o.complexity, s.name as specialtyName
-          FROM operations o
-          JOIN specialties s ON o.specialtyId = s.id
-          WHERE o.id = ?
-        `;
+        // Using table operations instead of execute
+        const operations = await fine.table("operations").select("*").eq("id", Number(operationId));
         
-        const data = await fine.execute(query, [operationId]);
-        if (data && data.length > 0) {
-          setOperation(data[0]);
+        if (operations && operations.length > 0) {
+          const op = operations[0];
+          
+          // Get specialty name in a separate query
+          const specialties = await fine.table("specialties").select("name").eq("id", op.specialtyId);
+          
+          if (specialties && specialties.length > 0) {
+            setOperation({
+              ...op,
+              specialtyName: specialties[0].name
+            });
+          } else {
+            setOperation(op);
+          }
         }
       } catch (error) {
         console.error("Failed to fetch operation:", error);

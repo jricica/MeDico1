@@ -23,16 +23,25 @@ export function OperationsList({ favoritesOnly = false }: OperationsListProps) {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch operations with specialty names
-        let query = `
-          SELECT 
-            o.id, o.name, o.code, o.specialtyId, o.basePoints, 
-            o.description, o.complexity, s.name as specialtyName
-          FROM operations o
-          JOIN specialties s ON o.specialtyId = s.id
-        `;
+        // Fetch operations
+        const operationsData = await fine.table("operations").select("*");
         
-        const operationsData = await fine.execute(query);
+        if (operationsData) {
+          // Fetch specialties to get names
+          const specialties = await fine.table("specialties").select("id, name");
+          
+          // Map operations with specialty names
+          const mappedOperations = operationsData.map(op => {
+            const specialty = specialties?.find(s => s.id === op.specialtyId);
+            return {
+              ...op,
+              specialtyName: specialty?.name || "Unknown Specialty"
+            };
+          });
+          
+          setOperations(mappedOperations);
+          setFilteredOperations(mappedOperations);
+        }
         
         // Fetch user favorites
         if (session?.user?.id) {
@@ -43,11 +52,6 @@ export function OperationsList({ favoritesOnly = false }: OperationsListProps) {
           if (favoritesData) {
             setFavorites(favoritesData.map(f => f.operationId));
           }
-        }
-        
-        if (operationsData) {
-          setOperations(operationsData);
-          setFilteredOperations(operationsData);
         }
       } catch (error) {
         console.error("Failed to fetch data:", error);

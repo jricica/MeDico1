@@ -18,43 +18,80 @@ export function DashboardStats() {
       
       setLoading(true);
       try {
-        // Fetch recent calculations with operation and hospital names
-        const recentQuery = `
-          SELECT 
-            ch.id, ch.calculatedValue, ch.calculatedAt,
-            o.name as operationName, h.name as hospitalName
-          FROM calculationHistory ch
-          JOIN operations o ON ch.operationId = o.id
-          JOIN hospitals h ON ch.hospitalId = h.id
-          WHERE ch.userId = ?
-          ORDER BY ch.calculatedAt DESC
-          LIMIT 5
-        `;
+        // Fetch recent calculations
+        const historyData = await fine.table("calculationHistory")
+          .select("*")
+          .eq("userId", session.user.id)
+          .order("calculatedAt", { ascending: false })
+          .limit(5);
         
-        const recentData = await fine.execute(recentQuery, [session.user.id]);
-        
-        // Fetch specialty distribution
-        const specialtyQuery = `
-          SELECT 
-            s.name as specialtyName,
-            COUNT(ch.id) as calculationCount
-          FROM calculationHistory ch
-          JOIN operations o ON ch.operationId = o.id
-          JOIN specialties s ON o.specialtyId = s.id
-          WHERE ch.userId = ?
-          GROUP BY s.id
-          ORDER BY calculationCount DESC
-          LIMIT 5
-        `;
-        
-        const specialtyData = await fine.execute(specialtyQuery, [session.user.id]);
-        
-        if (recentData) {
-          setRecentCalculations(recentData);
+        if (historyData && historyData.length > 0) {
+          // Fetch operation names
+          const operationIds = historyData.map(h => h.operationId);
+          const operations = await fine.table("operations")
+            .select("id, name")
+            .in("id", operationIds);
+          
+          // Fetch hospital names
+          const hospitalIds = historyData.map(h => h.hospitalId);
+          const hospitals = await fine.table("hospitals")
+            .select("id, name")
+            .in("id", hospitalIds);
+          
+          // Map the data
+          const mappedData = historyData.map(calc => {
+            const operation = operations?.find(o => o.id === calc.operationId);
+            const hospital = hospitals?.find(h => h.id === calc.hospitalId);
+            
+            return {
+              ...calc,
+              operationName: operation?.name || "Unknown Operation",
+              hospitalName: hospital?.name || "Unknown Hospital"
+            };
+          });
+          
+          setRecentCalculations(mappedData);
         }
         
-        if (specialtyData) {
-          setSpecialtyStats(specialtyData);
+        // For specialty stats, we'll need to do multiple queries
+        // First get all calculations by this user
+        const allCalculations = await fine.table("calculationHistory")
+          .select("operationId")
+          .eq("userId", session.user.id);
+        
+        if (allCalculations && allCalculations.length > 0) {
+          // Get all operations
+          const operationIds = allCalculations.map(c => c.operationId);
+          const operations = await fine.table("operations")
+            .select("id, specialtyId")
+            .in("id", operationIds);
+          
+          // Count by specialty
+          const specialtyCounts: Record<number, number> = {};
+          operations?.forEach(op => {
+            if (specialtyCounts[op.specialtyId]) {
+              specialtyCounts[op.specialtyId]++;
+            } else {
+              specialtyCounts[op.specialtyId] = 1;
+            }
+          });
+          
+          // Get specialty names
+          const specialtyIds = Object.keys(specialtyCounts).map(Number);
+          const specialties = await fine.table("specialties")
+            .select("id, name")
+            .in("id", specialtyIds);
+          
+          // Create the final stats array
+          const stats = specialties?.map(specialty => ({
+            specialtyName: specialty.name,
+            calculationCount: specialtyCounts[specialty.id] || 0
+          })) || [];
+          
+          // Sort by count descending
+          stats.sort((a, b) => b.calculationCount - a.calculationCount);
+          
+          setSpecialtyStats(stats.slice(0, 5)); // Take top 5
         }
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
