@@ -1,18 +1,12 @@
 import { useState, useEffect } from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from "@/components/ui/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { fine } from "@/lib/fine";
 import type { Schema } from "@/lib/db-types";
@@ -26,12 +20,15 @@ export function HospitalSelector({ onSelect, selectedId }: HospitalSelectorProps
   const [open, setOpen] = useState(false);
   const [hospitals, setHospitals] = useState<Schema["hospitals"][]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredHospitals, setFilteredHospitals] = useState<Schema["hospitals"][]>([]);
 
   useEffect(() => {
     const fetchHospitals = async () => {
       try {
         const data = await fine.table("hospitals").select();
         setHospitals(data || []);
+        setFilteredHospitals(data || []);
       } catch (error) {
         console.error("Failed to fetch hospitals:", error);
       } finally {
@@ -41,6 +38,18 @@ export function HospitalSelector({ onSelect, selectedId }: HospitalSelectorProps
 
     fetchHospitals();
   }, []);
+
+  useEffect(() => {
+    if (searchQuery) {
+      const filtered = hospitals.filter(hospital => 
+        hospital.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (hospital.location && hospital.location.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+      setFilteredHospitals(filtered);
+    } else {
+      setFilteredHospitals(hospitals);
+    }
+  }, [searchQuery, hospitals]);
 
   const selectedHospital = hospitals.find(h => h.id === selectedId);
 
@@ -57,38 +66,51 @@ export function HospitalSelector({ onSelect, selectedId }: HospitalSelectorProps
           {selectedId && selectedHospital
             ? selectedHospital.name
             : "Select hospital"}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0">
-        <Command>
-          <CommandInput placeholder="Search hospital..." />
-          <CommandEmpty>No hospital found.</CommandEmpty>
-          <CommandGroup>
-            {hospitals.map((hospital) => (
-              <CommandItem
-                key={hospital.id}
-                onSelect={() => {
-                  onSelect(hospital.id!);
-                  setOpen(false);
-                }}
-              >
-                <Check
+      <PopoverContent className="w-full p-0" align="start">
+        <div className="p-2">
+          <Input
+            placeholder="Search hospital..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="mb-2"
+          />
+          <div className="max-h-[300px] overflow-y-auto">
+            {filteredHospitals.length === 0 ? (
+              <div className="p-2 text-center text-sm text-muted-foreground">
+                No hospital found.
+              </div>
+            ) : (
+              filteredHospitals.map((hospital) => (
+                <div
+                  key={hospital.id}
                   className={cn(
-                    "mr-2 h-4 w-4",
-                    selectedId === hospital.id ? "opacity-100" : "opacity-0"
+                    "flex cursor-pointer items-center rounded-md px-2 py-2 text-sm",
+                    selectedId === hospital.id ? "bg-accent text-accent-foreground" : "hover:bg-muted"
                   )}
-                />
-                {hospital.name}
-                {hospital.location && (
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    ({hospital.location})
-                  </span>
-                )}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        </Command>
+                  onClick={() => {
+                    onSelect(hospital.id!);
+                    setOpen(false);
+                  }}
+                >
+                  <div className="flex-1">
+                    {hospital.name}
+                    {hospital.location && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        ({hospital.location})
+                      </span>
+                    )}
+                  </div>
+                  {selectedId === hospital.id && (
+                    <div className="h-2 w-2 rounded-full bg-primary"></div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </PopoverContent>
     </Popover>
   );
