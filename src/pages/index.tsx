@@ -1,14 +1,83 @@
-// Update this page (the content is just a fallback if you fail to update the page). Always include w-full and min-h-screen classes in the main element.
+import { AppLayout } from "@/components/layout/AppLayout";
+import { DashboardStats } from "@/components/ui/DashboardStats";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { fine } from "@/lib/fine";
+import { Calculator, ListChecks, Star } from "lucide-react";
+import { Link } from "react-router-dom";
+
 const Index = () => {
+  const { data: session } = fine.auth.useSession();
+
   return (
-    <main className="w-full min-h-screen flex flex-col items-center justify-center bg-background text-foreground">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your App</h1>
-        <p className="text-xl text-muted-foreground mb-8">
-          Start building your amazing project here!
-        </p>
+    <AppLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Welcome back, {session?.user?.name || "Doctor"}! Manage your medical operation valuations.
+          </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Calculate Operation
+              </CardTitle>
+              <Calculator className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">Valuation Tool</div>
+              <p className="text-xs text-muted-foreground">
+                Calculate the value of medical procedures
+              </p>
+              <Button asChild className="mt-4 w-full">
+                <Link to="/calculator">Start Calculation</Link>
+              </Button>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Browse Operations
+              </CardTitle>
+              <ListChecks className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">Operation Database</div>
+              <p className="text-xs text-muted-foreground">
+                View all available medical procedures
+              </p>
+              <Button asChild variant="outline" className="mt-4 w-full">
+                <Link to="/operations">View Operations</Link>
+              </Button>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Favorites
+              </CardTitle>
+              <Star className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">Saved Operations</div>
+              <p className="text-xs text-muted-foreground">
+                Quick access to your favorite procedures
+              </p>
+              <Button asChild variant="outline" className="mt-4 w-full">
+                <Link to="/favorites">View Favorites</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        <DashboardStats />
       </div>
-    </main>
+    </AppLayout>
   );
 };
 

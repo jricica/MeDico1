@@ -1,7 +1,4 @@
-//use this component to create a sidebar for your application
-// place it in main.tsx file
-//adjust the items based on route paths
-import { Home } from "lucide-react";
+import { Calculator, History, Home, Settings, Star, Stethoscope } from "lucide-react";
 
 import {
   Sidebar,
@@ -17,9 +14,34 @@ import { Link } from "react-router-dom";
 
 const items = [
   {
-    title: "Home",
+    title: "Dashboard",
     url: "/",
     icon: Home,
+  },
+  {
+    title: "Operations",
+    url: "/operations",
+    icon: Stethoscope,
+  },
+  {
+    title: "Calculator",
+    url: "/calculator",
+    icon: Calculator,
+  },
+  {
+    title: "Favorites",
+    url: "/favorites",
+    icon: Star,
+  },
+  {
+    title: "History",
+    url: "/history",
+    icon: History,
+  },
+  {
+    title: "Settings",
+    url: "/settings",
+    icon: Settings,
   },
 ];
 
@@ -28,7 +50,7 @@ export function AppSidebar() {
     <Sidebar className="bg-primary">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Application</SidebarGroupLabel>
+          <SidebarGroupLabel>MedValor</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
