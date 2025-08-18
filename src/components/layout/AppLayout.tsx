@@ -49,7 +49,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div className="flex h-16 items-center justify-between px-4">
           <Link to="/" className="flex items-center space-x-2">
             <Stethoscope className="h-6 w-6" />
-            <span className="text-xl font-bold">MedValor</span>
+            <span className="text-xl font-bold">MeDico</span>
           </Link>
           {isMobile && (
             <Button variant="ghost" size="icon" onClick={toggleSidebar}>
@@ -116,7 +116,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               <Button variant="ghost" size="icon" onClick={toggleSidebar}>
                 <Menu className="h-5 w-5" />
               </Button>
-              <span className="ml-3 text-lg font-bold">MedValor</span>
+              <span className="ml-3 text-lg font-bold">MeDico</span>
             </div>
           </header>
         )}

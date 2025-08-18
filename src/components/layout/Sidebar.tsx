@@ -50,7 +50,7 @@ export function AppSidebar() {
     <Sidebar className="bg-primary">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>MedValor</SidebarGroupLabel>
+          <SidebarGroupLabel>MeDico</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
