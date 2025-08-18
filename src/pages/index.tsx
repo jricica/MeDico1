@@ -14,6 +14,14 @@ const Index = () => {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <img
+            src="public\favicon.png"
+            alt="MeDico Logo"
+            className="h-20 w-30 rounded-full"
+            draggable={false}
+            style={{ display: "block", marginLeft: "auto", marginRight: "auto", marginTop: "10px" }}
+            contentEditable={false}
+          />
           <p className="text-muted-foreground">
             Welcome back, {session?.user?.name || "Doctor"}! Manage your medical operation valuations.
           </p>
