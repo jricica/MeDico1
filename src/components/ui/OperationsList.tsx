@@ -1,3 +1,4 @@
+//OperationsList.tsx
 import { useState, useEffect } from "react";
 import { OperationCard } from "@/components/ui/OperationCard";
 import { SearchBar } from "@/components/ui/SearchBar";
@@ -8,11 +9,12 @@ import type { Schema } from "@/lib/db-types";
 
 interface OperationsListProps {
   favoritesOnly?: boolean;
+  csvOperations?: any[]; // Datos del CSV
 }
 
-export function OperationsList({ favoritesOnly = false }: OperationsListProps) {
-  const [operations, setOperations] = useState<(Schema["operations"] & { specialtyName: string })[]>([]);
-  const [filteredOperations, setFilteredOperations] = useState<(Schema["operations"] & { specialtyName: string })[]>([]);
+export function OperationsList({ favoritesOnly = false, csvOperations }: OperationsListProps) {
+  const [operations, setOperations] = useState<(Schema["operations"] & { specialtyName: string; price?: string })[]>([]);
+  const [filteredOperations, setFilteredOperations] = useState<(Schema["operations"] & { specialtyName: string; price?: string })[]>([]);
   const [favorites, setFavorites] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -23,32 +25,43 @@ export function OperationsList({ favoritesOnly = false }: OperationsListProps) {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch operations
+        // 1️⃣ Datos de la DB
         const operationsData = await fine.table("operations").select("*");
-        
-        if (operationsData) {
-          // Fetch specialties to get names
-          const specialties = await fine.table("specialties").select("id, name");
-          
-          // Map operations with specialty names
-          const mappedOperations = operationsData.map(op => {
-            const specialty = specialties?.find(s => s.id === op.specialtyId);
-            return {
-              ...op,
-              specialtyName: specialty?.name || "Unknown Specialty"
-            };
-          });
-          
-          setOperations(mappedOperations);
-          setFilteredOperations(mappedOperations);
-        }
-        
-        // Fetch user favorites
+        const specialties = await fine.table("specialties").select("id, name");
+
+        const dbMapped = operationsData.map(op => {
+          const specialty = specialties?.find(s => s.id === op.specialtyId);
+          return {
+            ...op,
+            specialtyName: specialty?.name || "Unknown Specialty",
+          };
+        });
+
+        // 2️⃣ Datos del CSV mapeados al mismo tipo
+        const csvMapped = csvOperations?.map((c, index) => ({
+          id: -(index + 1),       // id negativo para evitar choque con DB
+          name: c.cirugia,         // <-- ahora usa la columna correcta
+          code: c.codigo,          // <-- si quieres
+          specialtyId: 0,          // obligatorio (puedes asignar 0)
+          basePoints: parseFloat(c.rvu) || 0,  // si quieres usar rvu
+          description: "",         // obligatorio
+          complexity: 0,           // obligatorio
+          specialtyName: c.especialidad,
+          price: undefined          // opcional
+        })) || [];
+
+
+        // 3️⃣ Combinar DB + CSV
+        const allOperations = [...dbMapped, ...csvMapped];
+        setOperations(allOperations);
+        setFilteredOperations(allOperations);
+
+        // 4️⃣ Favoritos
         if (session?.user?.id) {
           const favoritesData = await fine.table("favorites")
             .select("operationId")
             .eq("userId", session.user.id);
-          
+
           if (favoritesData) {
             setFavorites(favoritesData.map(f => f.operationId));
           }
@@ -61,32 +74,23 @@ export function OperationsList({ favoritesOnly = false }: OperationsListProps) {
     };
 
     fetchData();
-  }, [session?.user?.id]);
+  }, [csvOperations, session?.user?.id]);
 
   useEffect(() => {
-    // Apply filters
+    // Aplicar filtros
     let filtered = operations;
-    
-    // Filter by favorites if needed
-    if (favoritesOnly) {
-      filtered = filtered.filter(op => favorites.includes(op.id!));
-    }
-    
-    // Filter by specialty
-    if (selectedSpecialty !== null) {
-      filtered = filtered.filter(op => op.specialtyId === selectedSpecialty);
-    }
-    
-    // Filter by search query
+
+    if (favoritesOnly) filtered = filtered.filter(op => favorites.includes(op.id!));
+    if (selectedSpecialty !== null) filtered = filtered.filter(op => op.specialtyId === selectedSpecialty);
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(op => 
-        op.name.toLowerCase().includes(query) || 
+      filtered = filtered.filter(op =>
+        op.name.toLowerCase().includes(query) ||
         (op.code && op.code.toLowerCase().includes(query)) ||
         (op.description && op.description.toLowerCase().includes(query))
       );
     }
-    
+
     setFilteredOperations(filtered);
   }, [operations, favorites, selectedSpecialty, searchQuery, favoritesOnly]);
 
@@ -95,10 +99,8 @@ export function OperationsList({ favoritesOnly = false }: OperationsListProps) {
       const favoritesData = await fine.table("favorites")
         .select("operationId")
         .eq("userId", session.user.id);
-      
-      if (favoritesData) {
-        setFavorites(favoritesData.map(f => f.operationId));
-      }
+
+      if (favoritesData) setFavorites(favoritesData.map(f => f.operationId));
     }
   };
 
@@ -109,13 +111,13 @@ export function OperationsList({ favoritesOnly = false }: OperationsListProps) {
           <SearchBar onSearch={setSearchQuery} />
         </div>
         <div className="w-full md:w-1/3">
-          <SpecialtyFilter 
-            onSelect={setSelectedSpecialty} 
+          <SpecialtyFilter
+            onSelect={setSelectedSpecialty}
             selectedId={selectedSpecialty}
           />
         </div>
       </div>
-      
+
       {loading ? (
         <div className="flex h-40 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -124,8 +126,8 @@ export function OperationsList({ favoritesOnly = false }: OperationsListProps) {
         <div className="flex h-40 flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
           <p className="text-lg font-medium">No operations found</p>
           <p className="text-sm text-muted-foreground">
-            {favoritesOnly 
-              ? "You haven't added any operations to your favorites yet." 
+            {favoritesOnly
+              ? "You haven't added any operations to your favorites yet."
               : "Try adjusting your filters or search query."}
           </p>
         </div>

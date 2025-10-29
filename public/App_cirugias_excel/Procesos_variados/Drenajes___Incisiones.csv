@@ -1,0 +1,6 @@
+﻿codigo,cirugia,rvu,especialidad,grupo
+10120,INCS & REMOV F B SUBQ TISS; SIMPL,0.4,Cirugía General,Drenajes / Incisiones
+10121,INCS & REMOV F B SUBQ TISS; COMPLIC,1.2,Cirugía General,Drenajes / Incisiones
+10140,I&D HEMATOMA/SEROMA/FLUID COLLEC,0.3,Cirugía General,Drenajes / Incisiones
+10160,PUNCT ASPIRAT ABSCESS/HEMATOMA/BULLA/CYST,0.3,Cirugía General,Drenajes / Incisiones
+10180,I&D COMPLX POSTOP WOUND INFEC,1.8,Cirugía General,Drenajes / Incisiones

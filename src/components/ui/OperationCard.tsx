@@ -111,23 +111,25 @@ export function OperationCard({
               {operation.specialtyName}
             </Badge>
           )}
-          <Badge 
-            variant="outline" 
-            className={cn(
-              "ml-auto",
-              operation.complexity === 1 && "bg-green-500/10 text-green-700",
-              operation.complexity === 2 && "bg-yellow-500/10 text-yellow-700",
-              operation.complexity === 3 && "bg-orange-500/10 text-orange-700",
-              operation.complexity === 4 && "bg-red-500/10 text-red-700",
-              operation.complexity === 5 && "bg-purple-500/10 text-purple-700"
-            )}
-          >
-            {operation.complexity === 1 && "Simple"}
-            {operation.complexity === 2 && "Moderate"}
-            {operation.complexity === 3 && "Complex"}
-            {operation.complexity === 4 && "Very Complex"}
-            {operation.complexity === 5 && "Extremely Complex"}
-          </Badge>
+          {operation.complexity && (
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "ml-auto",
+                operation.complexity === 1 && "bg-green-500/10 text-green-700",
+                operation.complexity === 2 && "bg-yellow-500/10 text-yellow-700",
+                operation.complexity === 3 && "bg-orange-500/10 text-orange-700",
+                operation.complexity === 4 && "bg-red-500/10 text-red-700",
+                operation.complexity === 5 && "bg-purple-500/10 text-purple-700"
+              )}
+            >
+              {operation.complexity === 1 && "Simple"}
+              {operation.complexity === 2 && "Moderate"}
+              {operation.complexity === 3 && "Complex"}
+              {operation.complexity === 4 && "Very Complex"}
+              {operation.complexity === 5 && "Extremely Complex"}
+            </Badge>
+          )}
         </div>
       </CardContent>
       <CardFooter>

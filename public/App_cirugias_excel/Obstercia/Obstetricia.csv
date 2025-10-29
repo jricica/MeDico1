@@ -1,0 +1,42 @@
+﻿codigo,cirugia,rvu,especialidad,grupo
+59000,AMNIOCENTESIS ANY METHD,1,Obstetricia,Parto / cesárea
+59012,CORDOCENTESIS ANY METHD,2.3,Obstetricia,Parto / cesárea
+59015,CHORIONIC VILLUS SAMPL ANY METHD,1.3,Obstetricia,Parto / cesárea
+59020,FETAL CONTRACTION STRESS TEST,0.5,Obstetricia,Parto / cesárea
+59025,FETAL NON-STRESS TEST,0.5,Obstetricia,Parto / cesárea
+59030,FETAL SCLP BLD SAMPL,0.6,Obstetricia,Parto / cesárea
+59050,INIT INT FETAL MONITOR-CONS W/REPORT (SEP PRO),0.7,Obstetricia,Parto / cesárea
+59100,HYSTEROTOMY ABD,7.2,Obstetricia,Parto / cesárea
+59120,SURG TX ECTOPIC PG; REQ SALPINGECT &/OR OOPHOREC,7.4,Obstetricia,Parto / cesárea
+59121,SURG TX ECTOPIC PG; WO SALPINGECT &/OR OOPHORECT,7.2,Obstetricia,Parto / cesárea
+59130,SURG TX ECTOPIC PG; ABD PG,6.9,Obstetricia,Parto / cesárea
+59135,SURG TX ECTOPIC PG; UTERINE PG REQ TOT HYST,8.2,Obstetricia,Parto / cesárea
+59136,SURG TX ECTOPIC PG; UTERINE PG PART RESEC UTERUS,8,Obstetricia,Parto / cesárea
+59140,SURG TX ECTOPIC PG; CERV W/EVACUATION,5.3,Obstetricia,Parto / cesárea
+59150,LAP TX ECTOPIC PG; WO SALPINGECT &/OR OOPHORECT,7.2,Obstetricia,Parto / cesárea
+59151,LAP TX ECTOPIC PG; W/SALPINGECT &/OR OOPHORECT,7.4,Obstetricia,Parto / cesárea
+59160,CURET PP (SEPART PROC),2.6,Obstetricia,Parto / cesárea
+59200,INSRT CERV DILAT (SEPART PROC),0.9,Obstetricia,Parto / cesárea
+59300,EPISIOTOMY/VAG REPR-BY OTHER THAN ATTENDING MD,1.8,Obstetricia,Parto / cesárea
+59320,CERCLAGE CERV DURING PG; VAG,3.4,Obstetricia,Parto / cesárea
+59325,CERCLAGE CERV DURING PG; ABD,4.9,Obstetricia,Parto / cesárea
+59350,HYSTERORRHAPHY RUPT UTERUS,5.4,Obstetricia,Parto / cesárea
+59400,ROUTINE OB CARE INCL ANTEPARTUM CARE-VAG DEL-PP,8.8,Obstetricia,Parto / cesárea
+59410,VAG DELIV ONLY INCL PP CARE,5.1,Obstetricia,Parto / cesárea
+59412,EXT CEPHALIC VERSION W/WO TOCOLYSIS (ADD TO DEL),1.7,Obstetricia,Parto / cesárea
+59414,DELIV PLACENTA (SEPART PROC),1.1,Obstetricia,Parto / cesárea
+59430,PP CARE ONLY (SEPART PROC),0.5,Obstetricia,Parto / cesárea
+59510,ROUTINE OB CARE INCL ANTEPARTUM CARE-C SECT-PP,10.6,Obstetricia,Parto / cesárea
+59515,C DELIV ONLY INCL PP CARE,6.8,Obstetricia,Parto / cesárea
+59525,SUBTL/TOT HYST AFTER CESAREAN DELIV,2.8,Obstetricia,Parto / cesárea
+59812,TX INCOMPL AB ANY TRIMESTER COMPLT SURGICALLY,2.7,Obstetricia,Parto / cesárea
+59820,TX MISSED AB COMPLT SURGICALLY; FIRST TRIMESTER,2.7,Obstetricia,Parto / cesárea
+59821,TX MISSED AB COMPLT SURG; 2ND TRIMESTER,3.2,Obstetricia,Parto / cesárea
+59830,TX SEPTIC AB COMPLT SURGICALLY,3.9,Obstetricia,Parto / cesárea
+59840,INDUCED AB BY DILAT & CURET,3.3,Obstetricia,Parto / cesárea
+59841,INDUCED AB BY DILAT & EVACUATION,3.6,Obstetricia,Parto / cesárea
+59850,INDUCED AB BY INTRA-AMNIOTIC INJ INCL HOSP ADMIN,4.4,Obstetricia,Parto / cesárea
+59851,INDUCED AB BY INTRA-AMNIOTIC INJ; W/D&C,5.3,Obstetricia,Parto / cesárea
+59852,INDUCED AB BY INTRA-AMNIOTIC INJ; W/HYSTEROTOMY,6.5,Obstetricia,Parto / cesárea
+59870,UTERINE EVACUATION & CURET HYDATIDIFORM MOLE,2.7,Obstetricia,Parto / cesárea
+59899,UNLISTED PROC MATERN CARE & DELIV,BR,Obstetricia,Parto / cesárea
