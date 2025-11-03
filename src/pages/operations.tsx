@@ -1,43 +1,107 @@
 import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { loadCSV } from "@/utils/csvLoader";
-import { ChevronDown, ChevronRight, Folder, FolderOpen, FileText } from "lucide-react";
-import { OperationCard } from "@/components/ui/OperationCard";
+import { ChevronDown, ChevronRight, Folder, FolderOpen, Calculator } from "lucide-react";
 
-// Define tu estructura de carpetas
+// Tipo para las operaciones del CSV
+interface CSVOperation {
+  codigo?: string;
+  cirugia?: string;
+  rvu?: string;
+  especialidad?: string;
+  grupo?: string;
+  [key: string]: any;
+}
+
+// ✅ Estructura actualizada - Vasos Periféricos dentro de Cardiovascular
 const folderStructure = {
   Cardiovascular: {
     Corazón: "Cardiovascular/corazon.csv",
-    "Cirugía Cardiovascular": "Cardiovascular/cardiovascular.csv",
-  },
-  "Vasos Periféricos": {
-    "Cirugía Vascular": "VasosPerifericos/vasos.csv",
+    "Vasos Periféricos": "VasosPerifericos/vasos.csv", // ✅ Movido aquí
   },
 };
+
+// Tarjeta de operación
+function SimpleOperationCard({ operation, index }: { operation: any; index: number }) {
+  const codigo = operation?.codigo || 'N/A';
+  const cirugia = operation?.cirugia || 'Sin nombre';
+  const rvu = operation?.rvu || '0';
+  const especialidad = operation?.especialidad || 'N/A';
+  const grupo = operation?.grupo || 'N/A';
+  
+  return (
+    <div className="border rounded-lg p-4 bg-white shadow hover:shadow-lg transition-shadow">
+      {/* Código en la esquina superior derecha */}
+      <div className="flex justify-end mb-2">
+        <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold">
+          {codigo}
+        </span>
+      </div>
+      
+      {/* Título de la cirugía */}
+      <h3 className="font-bold text-lg text-gray-900 mb-3">
+        {cirugia}
+      </h3>
+      
+      {/* Información */}
+      <div className="space-y-2 text-sm text-gray-700">
+        <p>
+          <span className="font-semibold text-gray-600">Especialidad:</span>{' '}
+          <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
+            {especialidad}
+          </span>
+        </p>
+        <p>
+          <span className="font-semibold text-gray-600">Grupo:</span>{' '}
+          <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded">
+            {grupo}
+          </span>
+        </p>
+        <p>
+          <span className="font-semibold text-gray-600">RVU:</span>{' '}
+          <span className="ml-2 bg-green-100 text-green-700 px-3 py-1 rounded font-bold text-base">
+            {rvu}
+          </span>
+        </p>
+      </div>
+      
+      {/* Botón */}
+      <button className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold">
+        <Calculator className="w-4 h-4" />
+        Calcular Valor
+      </button>
+    </div>
+  );
+}
 
 const Operations = () => {
   const [csvData, setCsvData] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [expandedSpecialties, setExpandedSpecialties] = useState<Record<string, boolean>>({});
   const [expandedSubcategories, setExpandedSubcategories] = useState<Record<string, boolean>>({});
-  const [selectedOperation, setSelectedOperation] = useState<any>(null);
 
   useEffect(() => {
     async function fetchAllCSV() {
+      console.log("🚀 Iniciando carga de CSVs...");
+      
       try {
         const data: Record<string, any[]> = {};
         
-        // Cargar todos los CSV según la estructura
         for (const [specialty, subcategories] of Object.entries(folderStructure)) {
           for (const [subName, csvPath] of Object.entries(subcategories)) {
-            data[csvPath] = await loadCSV(csvPath);
+            const csvContent = await loadCSV(csvPath);
+            data[csvPath] = csvContent;
+            console.log(`✅ ${csvPath}: ${csvContent.length} cirugías cargadas`);
           }
         }
         
-        console.log("Datos CSV cargados:", data);
+        console.log("🎉 Todos los CSVs cargados exitosamente");
         setCsvData(data);
+        
       } catch (err: any) {
-        console.error("Error al cargar CSV:", err.message);
+        console.error("💥 ERROR:", err);
+        setError(err.message);
       } finally {
         setLoading(false);
       }
@@ -63,8 +127,22 @@ const Operations = () => {
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <p>Cargando operaciones...</p>
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-xl font-semibold text-gray-700">Cargando cirugías...</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <AppLayout>
+        <div className="bg-red-50 border-2 border-red-200 rounded-lg p-8 m-8">
+          <h2 className="text-2xl font-bold text-red-700 mb-4">❌ Error</h2>
+          <p className="text-red-600">{error}</p>
         </div>
       </AppLayout>
     );
@@ -73,91 +151,93 @@ const Operations = () => {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Operations Database</h1>
-          <p className="text-muted-foreground">
-            Browse all available medical procedures
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-6 shadow-lg">
+          <h1 className="text-3xl font-bold text-white mb-2">
+            Base de Datos de Cirugías
+          </h1>
+          <p className="text-blue-100">
+            {Object.values(csvData).reduce((total, ops) => total + ops.length, 0)} cirugías disponibles
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Panel de navegación */}
-          <div className="lg:col-span-1 space-y-2">
-            {Object.entries(folderStructure).map(([specialty, subcategories]) => (
-              <div key={specialty} className="border rounded-lg overflow-hidden">
-                <button
-                  onClick={() => toggleSpecialty(specialty)}
-                  className="w-full flex items-center gap-2 p-3 bg-white hover:bg-gray-50"
-                >
-                  {expandedSpecialties[specialty] ? (
-                    <ChevronDown className="w-5 h-5" />
-                  ) : (
-                    <ChevronRight className="w-5 h-5" />
-                  )}
-                  <Folder className="w-5 h-5" />
-                  <span className="font-medium">{specialty}</span>
-                </button>
-
-                {expandedSpecialties[specialty] && (
-                  <div className="bg-gray-50 border-t">
-                    {Object.entries(subcategories).map(([subName, csvPath]) => {
-                      const operations = csvData[csvPath] || [];
-                      const subKey = `${specialty}-${subName}`;
-                      
-                      return (
-                        <div key={subKey}>
-                          <button
-                            onClick={() => toggleSubcategory(subKey)}
-                            className="w-full flex items-center gap-2 p-2 pl-8 hover:bg-gray-100"
-                          >
-                            {expandedSubcategories[subKey] ? (
-                              <ChevronDown className="w-4 h-4" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4" />
-                            )}
-                            <FolderOpen className="w-4 h-4" />
-                            <span className="text-sm">{subName}</span>
-                            <span className="ml-auto text-xs bg-gray-200 px-2 py-0.5 rounded">
-                              {operations.length}
-                            </span>
-                          </button>
-
-                          {expandedSubcategories[subKey] && (
-                            <div className="bg-white">
-                              {operations.map((op: any, idx: number) => (
-                                <button
-                                  key={idx}
-                                  onClick={() => setSelectedOperation(op)}
-                                  className="w-full text-left p-2 pl-12 text-sm hover:bg-blue-50"
-                                >
-                                  <FileText className="inline w-3 h-3 mr-2" />
-                                  {op.name}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+        {/* Navegación por carpetas */}
+        <div className="space-y-4">
+          {Object.entries(folderStructure).map(([specialty, subcategories]) => (
+            <div key={specialty} className="border rounded-lg overflow-hidden bg-white shadow-md">
+              {/* Especialidad */}
+              <button
+                onClick={() => toggleSpecialty(specialty)}
+                className="w-full flex items-center gap-3 p-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white transition-colors"
+              >
+                {expandedSpecialties[specialty] ? (
+                  <ChevronDown className="w-6 h-6" />
+                ) : (
+                  <ChevronRight className="w-6 h-6" />
                 )}
-              </div>
-            ))}
-          </div>
+                <Folder className="w-6 h-6" />
+                <span className="font-bold text-lg">{specialty}</span>
+              </button>
 
-          {/* Panel de detalles */}
-          <div className="lg:col-span-2">
-            {selectedOperation ? (
-              <OperationCard 
-                operation={selectedOperation}
-                isFavorite={false}
-              />
-            ) : (
-              <div className="border rounded-lg p-12 text-center text-muted-foreground">
-                <p>Selecciona una operación para ver los detalles</p>
-              </div>
-            )}
-          </div>
+              {/* Subcategorías */}
+              {expandedSpecialties[specialty] && (
+                <div className="bg-gray-50">
+                  {Object.entries(subcategories).map(([subName, csvPath]) => {
+                    const operations = csvData[csvPath] || [];
+                    const subKey = `${specialty}-${subName}`;
+                    
+                    return (
+                      <div key={subKey} className="border-t">
+                        {/* Subcategoría */}
+                        <button
+                          onClick={() => toggleSubcategory(subKey)}
+                          className="w-full flex items-center gap-3 p-3 pl-8 bg-gray-100 hover:bg-gray-200 transition-colors"
+                        >
+                          {expandedSubcategories[subKey] ? (
+                            <ChevronDown className="w-5 h-5 text-blue-600" />
+                          ) : (
+                            <ChevronRight className="w-5 h-5 text-gray-600" />
+                          )}
+                          <FolderOpen className="w-5 h-5 text-blue-600" />
+                          <span className="font-semibold text-gray-900">{subName}</span>
+                          <span className="ml-auto bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-bold">
+                            {operations.length}
+                          </span>
+                        </button>
+
+                        {/* Tarjetas de operaciones */}
+                        {expandedSubcategories[subKey] && (
+                          <div className="p-6 bg-white">
+                            {operations.length === 0 ? (
+                              <p className="text-center text-gray-500 py-8">
+                                No hay cirugías en esta categoría
+                              </p>
+                            ) : (
+                              <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                  {operations.map((op, idx) => (
+                                    <SimpleOperationCard
+                                      key={idx}
+                                      operation={op}
+                                      index={idx}
+                                    />
+                                  ))}
+                                </div>
+
+                                <p className="mt-6 text-center text-gray-600 font-semibold">
+                                  📊 Mostrando {operations.length} cirugías
+                                </p>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </AppLayout>
