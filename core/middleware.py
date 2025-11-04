@@ -110,7 +110,7 @@ class ViteDevMiddleware:
             except Exception:
                 pass
         
-        if request.path.startswith('/App_cirugias_excel/'):
+        if request.path.startswith('/surgeries/'):
             public_file_path = os.path.join(settings.BASE_DIR, 'public', request.path.lstrip('/'))
             if os.path.exists(public_file_path):
                 mime_type, _ = mimetypes.guess_type(public_file_path)
