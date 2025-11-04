@@ -1,24 +1,343 @@
-# Logs
-logs
+# .gitignore - Archivo para excluir archivos/dir que no deben ir al repositorio
+# Uso: colocado en la raíz del repo (p. ej. /c:/MeDico/MeDico1/.gitignore)
+
+# -----------------------
+# Sistemas operativos
+# -----------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Icon?
+Icon?
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~              # archivos temporales de editores
+.*.swp
+*.swp
+.nfs*
+
+# -----------------------
+# Archivos de build / binarios / artefactos compilados
+# -----------------------
+# General
+/build/
+dist/
+tmp/
+temp/
+out/
+release/
+public/build/
+target/
+generated/
+*.o
+*.obj
+*.so
+*.dll
+*.exe
+*.class
+*.jar
+*.war
+*.ear
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
 *.log
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.vcxproj.user
+TestResults/
+*.nupkg
+*.snk
+
+# Java / Maven / Gradle
+*.class
+*.war
+*.ear
+*.jar
+*.iml
+/.mvn/
+target/
+.build/
+.gradle/
+.gradle-cache/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Node.js / frontend
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
+.pnp/
+.pnp.js
+.next/
+out/
+build/
+dist/
+.cache/
+.svelte-kit/
+.vite
+.esbuild
+*.tgz
 
-node_modules
-dist
-dist-ssr
-*.local
+# Python
+venv/
+ENV/
+env/
+.env/
+.venv/
+pip-wheel-metadata/
+wheels/
+share/python-wheels/
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.pytest_cache/
+mypy_cache/
+dmypy.json
+.pyre/
+celerybeat-schedule
+*.db
+*.sqlite3
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
+# Ruby
+*.gem
+*.rbc
+/.bundle/
+/vendor/bundle
+/log/
+/tmp/
+.byebug_history
+
+# Go
+bin/
+pkg/
+*.exe
+*.test
+*.out
+
+# Rust
+target/
+**/*.rs.bk
+
+# PHP / Composer
+/vendor/
+composer.phar
+composer.lock? # usualmente se versiona en aplicaciones, quitar si se necesita
+
+# Composer: si es librería, mantener composer.lock fuera; si app, comentar línea anterior.
+
+# Swift / Xcode
+*.xcworkspace
+*.xcuserstate
+*.xcuserdatad
+DerivedData/
+build/
+*.hmap
+*.ipa
+*.dSYM
+
+# Android
+.gradle/
+build/
+local.properties
+*.keystore
+captures/
+.externalNativeBuild/
+
+# iOS
+Pods/
+Podfile.lock
+
+# -----------------------
+# IDEs y editores
+# -----------------------
+# Visual Studio Code
+.vscode/
+.history/
+*.code-workspace
+
+# Visual Studio
+.vs/
 *.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+*.user
+*.userosscache
+*.sln.docstates
+
+# JetBrains (IntelliJ, PhpStorm, PyCharm, Rider, WebStorm)
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Eclipse
+.project
+.metadata
+.recommenders
+.settings/
+.bin/
+
+# NetBeans
+nbproject/private/
+build/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# Emacs
+*~
+\#*\#
+
+# Vim
+*.swp
+*.swo
+*.swn
+
+# -----------------------
+# Contenedores / Infra
+# -----------------------
+# Docker
+docker-compose.override.yml
+docker-compose.*.yml
+**/docker-compose.override.yml
+**/docker-compose.*.yml
+.env
+.env.local
+.env.*.local
+*.env
+docker-compose.override.yml
+docker-sync.yml
+.docker/
+tmp/
+
+# Kubernetes / Helm
+*.kubeconfig
+helm-debug.yaml
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+crash.log
+override.tf
+override.tf.json
+*.tfvars
+*.tfvars.json
+.terraform.lock.hcl
+
+# Ansible
+.inventory
+vault/
+
+# -----------------------
+# Archivos de configuración y secretos
+# -----------------------
+# Variables de entorno
+.env
+.env.* 
+.env.local
+secrets/
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+*.asc
+credentials
+credentials.json
+id_rsa
+id_rsa.pub
+authorized_keys
+
+# Archivos de configuración temporales
+settings.local.json
+local.settings.json
+
+# -----------------------
+# Logs, reportes, cobertura, caches
+# -----------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+coverage/
+coverage.*
+lcov-report/
+reports/
+jest-cache/
+jest-*.json
+
+# -----------------------
+# Bases de datos locales, artefactos de datos
+# -----------------------
+*.sqlite
+*.sqlite3
+*.db
+*.DB
+*.dump
+*.sql.gz
+*.bak
+*.backup
+
+# -----------------------
+# Otros comunes
+# -----------------------
+.idea/
+.vscode/
+*.orig
+*.patch
+*.rej
+*.bak
+*.swp
+*.swo
+*.tmp
+*.temp
+*.cache
+
+# Lockfiles (normalmente se versionan; descomentar si desea ignorarlos)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+# Pipfile.lock
+# composer.lock
+
+# -----------------------
+# Plantilla: archivos locales específicos del proyecto
+# -----------------------
+# Añade aquí otros archivos/directorios locales que no quieres trackear, ejemplo:
+# /secrets/
+# /local-credentials.json
+# /tmp_local_build/
+
+# Fin del .gitignore

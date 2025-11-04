@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AppLayout } from "@/components/layout/AppLayout";
+import { AppLayout } from "@/shared/components/layout/AppLayout";
 import { loadCSV } from "@/utils/csvLoader";
 import { ChevronDown, ChevronRight, Folder, FolderOpen, Calculator } from "lucide-react";
 
