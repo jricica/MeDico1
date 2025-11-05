@@ -252,8 +252,7 @@ class AuthService {
         });
 
         if (!response.ok) {
-          // Si el refresh token es inválido, limpiar todo
-          this.clearAuth();
+          // Token inválido - será manejado en el catch
           throw new TokenRefreshError('Refresh token expired or invalid');
         }
 
@@ -267,7 +266,7 @@ class AuthService {
           // Error de red - no limpiar tokens, permitir retry
           throw new NetworkError();
         }
-        // Error de autenticación - limpiar tokens
+        // Error de autenticación (TokenRefreshError u otros) - limpiar tokens
         this.clearAuth();
         throw error;
       } finally {

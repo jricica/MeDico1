@@ -184,8 +184,8 @@ class DisableCSRFForAPIMiddleware:
 
     def __call__(self, request):
         # Solo deshabilitar CSRF para rutas específicas de JWT (coincidencia exacta)
-        # Asegurar que el path termine en / para evitar coincidencias parciales
-        request_path = request.path if request.path.endswith('/') else request.path + '/'
+        # Normalizar path: remover trailing slash y agregar uno nuevo para consistencia
+        request_path = request.path.rstrip('/') + '/'
         
         if request_path in self.jwt_only_paths:
             setattr(request, '_dont_enforce_csrf_checks', True)

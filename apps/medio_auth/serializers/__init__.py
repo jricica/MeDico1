@@ -113,23 +113,26 @@ class LoginSerializer(serializers.Serializer):
             })
         
         user = None
-        user_exists = True
+        user_obj = None
         
         # Buscar usuario por email
         try:
             user_obj = User.objects.get(email=email)
         except User.DoesNotExist:
-            user_exists = False
-            user_obj = None
+            pass
         
         # Siempre realizar verificación de contraseña para prevenir timing attacks
-        if user_exists and user_obj:
-            # Autenticar con username (Django usa username por defecto)
-            user = authenticate(
-                request=self.context.get('request'),
-                username=user_obj.username,
-                password=password
-            )
+        if user_obj:
+            # Verificar contraseña manualmente primero (tiempo constante)
+            password_valid = check_password(password, user_obj.password)
+            
+            if password_valid:
+                # Solo autenticar si la contraseña es correcta
+                user = authenticate(
+                    request=self.context.get('request'),
+                    username=user_obj.username,
+                    password=password
+                )
         else:
             # Realizar dummy password check para mantener tiempo constante
             # Usar un hash falso que tenga el mismo tiempo de procesamiento

@@ -109,34 +109,7 @@ export default function SignupForm() {
       if (error instanceof AuthError) {
         errorMessage = error.getUserMessage();
       } else if (error?.message) {
-        // Intentar parsear JSON solo si parece ser un string JSON
-        if (typeof error.message === 'string' && error.message.trim().startsWith('{')) {
-          try {
-            const parsedError = JSON.parse(error.message);
-            if (parsedError.username) {
-              errorMessage = Array.isArray(parsedError.username) 
-                ? parsedError.username[0] 
-                : parsedError.username;
-            } else if (parsedError.email) {
-              errorMessage = Array.isArray(parsedError.email) 
-                ? parsedError.email[0] 
-                : parsedError.email;
-            } else if (parsedError.password) {
-              errorMessage = Array.isArray(parsedError.password) 
-                ? parsedError.password[0] 
-                : parsedError.password;
-            } else if (parsedError.license_number) {
-              errorMessage = Array.isArray(parsedError.license_number) 
-                ? parsedError.license_number[0] 
-                : parsedError.license_number;
-            }
-          } catch (parseError) {
-            // Si falla el parse, usar el mensaje original
-            errorMessage = error.message;
-          }
-        } else {
-          errorMessage = error.message;
-        }
+        errorMessage = error.message;
       }
 
       toast({

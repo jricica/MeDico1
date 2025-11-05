@@ -7,6 +7,7 @@ prevenir que la tabla de blacklist crezca indefinidamente.
 Uso:
     python manage.py cleanup_blacklisted_tokens
 """
+from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
@@ -33,7 +34,7 @@ class Command(BaseCommand):
         dry_run = options['dry_run']
         
         # Calcular fecha límite
-        cutoff_date = timezone.now() - timezone.timedelta(days=days)
+        cutoff_date = timezone.now() - timedelta(days=days)
         
         # Encontrar tokens expirados y blacklisteados
         expired_tokens = OutstandingToken.objects.filter(

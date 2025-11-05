@@ -86,30 +86,7 @@ export default function LoginForm() {
       if (error instanceof AuthError) {
         errorMessage = error.getUserMessage();
       } else if (error?.message) {
-        // Intentar parsear JSON solo si parece ser un string JSON
-        if (typeof error.message === 'string' && error.message.trim().startsWith('{')) {
-          try {
-            const parsedError = JSON.parse(error.message);
-            if (parsedError.email) {
-              errorMessage = Array.isArray(parsedError.email) 
-                ? parsedError.email[0] 
-                : parsedError.email;
-            } else if (parsedError.password) {
-              errorMessage = Array.isArray(parsedError.password) 
-                ? parsedError.password[0] 
-                : parsedError.password;
-            } else if (parsedError.non_field_errors) {
-              errorMessage = Array.isArray(parsedError.non_field_errors) 
-                ? parsedError.non_field_errors[0] 
-                : parsedError.non_field_errors;
-            }
-          } catch (parseError) {
-            // Si falla el parse, usar el mensaje original del error
-            errorMessage = error.message;
-          }
-        } else {
-          errorMessage = error.message;
-        }
+        errorMessage = error.message;
       }
 
       toast({

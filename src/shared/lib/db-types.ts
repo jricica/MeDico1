@@ -43,14 +43,14 @@ export type Schema = {
   
   favorites: {
     id?: number;
-    user_id: number;  // Django usa snake_case, tipo number
+    user_id: number;  // Django usa snake_case. Number porque Django AutoField es integer
     operation_id: number;  // Django usa snake_case
     created_at?: string;  // Django usa snake_case
   };
   
   calculationHistory: {
     id?: number;
-    user_id: number;  // Django usa snake_case, tipo number
+    user_id: number;  // Django usa snake_case. Number porque Django AutoField es integer
     operation_id: number;  // Django usa snake_case
     hospital_id: number;  // Django usa snake_case
     calculated_value: number;  // Django usa snake_case
