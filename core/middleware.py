@@ -158,3 +158,17 @@ def cleanup_vite():
                 pass
 
 atexit.register(cleanup_vite)
+
+
+class DisableCSRFForAPIMiddleware:
+    """
+    Deshabilitar CSRF para todas las rutas /api/*
+    JWT proporciona la seguridad necesaria para estas rutas
+    """
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.path.startswith('/api/'):
+            setattr(request, '_dont_enforce_csrf_checks', True)
+        return self.get_response(request)
