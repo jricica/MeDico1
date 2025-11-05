@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { AppLayout } from "@/shared/components/layout/AppLayout";
-import { loadCSV } from "@/shared/utils/csvLoader";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { loadCSV } from "@/utils/csvLoader";
 import { ChevronDown, ChevronRight, Folder, FolderOpen, Calculator } from "lucide-react";
 
 // Tipo para las operaciones del CSV
@@ -13,62 +13,11 @@ interface CSVOperation {
   [key: string]: any;
 }
 
+// ✅ Estructura actualizada - Vasos Periféricos dentro de Cardiovascular
 const folderStructure = {
   Cardiovascular: {
-    "Cardiovascular": "Cardiovascular/Cardiovascular.csv",
-    "Corazón": "Cardiovascular/Corazón.csv",
-    "Vasos Periféricos": "Cardiovascular/Vasos_periféricos.csv",
-  },
-  Dermatología: {
-    "Dermatología": "Dermatología/Dermatología.csv",
-  },
-  Digestivo: {
-    "Digestivo": "Digestivo/Digestivo.csv",
-    "Estómago e Intestino": "Digestivo/Estómago_e_intestino.csv",
-    "Hígado y Páncreas": "Digestivo/Hígado_Páncreas.csv",
-    "Peritoneo y Hernias": "Digestivo/Peritoneo_y_hernias.csv",
-  },
-  Endocrino: {
-    "Endocrino": "Endocrino/Endocrino.csv",
-  },
-  Ginecología: {
-    "Ginecología": "Ginecología/Ginecología.csv",
-  },
-  Mama: {
-    "Mama": "Mama/Mama.csv",
-  },
-  Neurocirugía: {
-    "Neurocirugía": "Neurocirugía/Neurocirugía.csv",
-    "Columna": "Neurocirugía/Columna.csv",
-    "Cráneo y Columna": "Neurocirugía/Cráneo_y_columna.csv",
-  },
-  Obstetricia: {
-    "Obstetricia": "Obstetricia/Obstetricia.csv",
-  },
-  Oftalmología: {
-    "Oftalmología": "Oftalmología/Oftalmología.csv",
-  },
-  Ortopedia: {
-    "Ortopedia": "Ortopedia/Ortopedia.csv",
-    "Cadera": "Ortopedia/Cadera.csv",
-    "Hombro": "Ortopedia/Hombro.csv",
-    "Muñeca y Mano": "Ortopedia/Muñeca_y_mano.csv",
-    "Pie": "Ortopedia/Pie.csv",
-  },
-  Otorrino: {
-    "Otorrino": "Otorrino/Otorrino.csv",
-  },
-  "Procesos Variados": {
-    "Cirugía General": "Procesos_variados/Cirugía_General.csv",
-    "Drenajes e Incisiones": "Procesos_variados/Drenajes___Incisiones.csv",
-    "Reparaciones (Suturas)": "Procesos_variados/Reparaciones_(suturas).csv",
-    "Uñas y Piel": "Procesos_variados/Uñas___piel.csv",
-  },
-  Urología: {
-    "Urología": "Urología/Urología.csv",
-  },
-  "Sin Clasificación": {
-    "Sin Clasificación": "Sin_clasificación.csv",
+    Corazón: "Cardiovascular/corazón.csv",
+    "Vasos Periféricos": "VasosPerifericos/vasos.csv", // ✅ Movido aquí
   },
   Demartología: {
     Demartología: "Dermatologia/Dermatología.csv",
@@ -77,6 +26,7 @@ const folderStructure = {
     "Estómago e Intestino": "Digestivo/Estómagp_e_intestino.csv",
     "Peritoneo y Hernias": "Digestivo/Peritoneo_y_hernias.csv",
     "Hígado & Páncreas": "Digestivo/Hígado_Páncreas.csv",
+
   },
   Endocrino: {
     Endocrino: "Endocrino/Endocrino.csv",
@@ -120,10 +70,8 @@ const folderStructure = {
   Urologia: {
     Urología: "Urologia/Urología.csv",
   },
-  "Sin clasificación": {
-    "Sin clasificación": "Sin_clasificacion/Sin_clasificación.csv",
-  },
-
+  
+  
 
 
 
