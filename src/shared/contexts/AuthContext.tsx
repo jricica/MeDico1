@@ -39,7 +39,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Verificar si hay token
       if (!authService.isAuthenticated()) {
         setUser(null);
-        setLoading(false);
         return;
       }
 

@@ -102,6 +102,8 @@ class LoginSerializer(serializers.Serializer):
     )
     
     def validate(self, attrs):
+        from django.contrib.auth.hashers import check_password
+        
         email = attrs.get('email')
         password = attrs.get('password')
         
@@ -110,24 +112,31 @@ class LoginSerializer(serializers.Serializer):
                 'non_field_errors': 'Debe proporcionar email y contraseña.'
             })
         
+        user = None
+        user_exists = True
+        
         # Buscar usuario por email
         try:
             user_obj = User.objects.get(email=email)
         except User.DoesNotExist:
-            # Usar mensaje genérico para prevenir enumeración de usuarios
-            raise ValidationError({
-                'non_field_errors': 'Credenciales inválidas. Por favor verifique su email y contraseña.'
-            })
+            user_exists = False
+            user_obj = None
         
-        # Autenticar con username (Django usa username por defecto)
-        user = authenticate(
-            request=self.context.get('request'),
-            username=user_obj.username,
-            password=password
-        )
+        # Siempre realizar verificación de contraseña para prevenir timing attacks
+        if user_exists and user_obj:
+            # Autenticar con username (Django usa username por defecto)
+            user = authenticate(
+                request=self.context.get('request'),
+                username=user_obj.username,
+                password=password
+            )
+        else:
+            # Realizar dummy password check para mantener tiempo constante
+            # Usar un hash falso que tenga el mismo tiempo de procesamiento
+            check_password(password, 'pbkdf2_sha256$260000$invalid$invalid')
         
+        # Usar mensaje genérico para prevenir enumeración de usuarios
         if not user:
-            # Usar mensaje genérico para prevenir enumeración de usuarios
             raise ValidationError({
                 'non_field_errors': 'Credenciales inválidas. Por favor verifique su email y contraseña.'
             })

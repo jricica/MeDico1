@@ -3,8 +3,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import get_user_model
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
@@ -19,7 +17,7 @@ from ..serializers import (
 User = get_user_model()
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+# CSRF protection handled by DisableCSRFForAPIMiddleware
 class RegisterView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []  # No requiere autenticación
@@ -44,7 +42,6 @@ class RegisterView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class LoginView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []  # No requiere autenticación
@@ -72,7 +69,6 @@ class LoginView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -105,7 +101,6 @@ class LogoutView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class RefreshTokenView(APIView):
     permission_classes = [AllowAny]
 
@@ -131,7 +126,6 @@ class RefreshTokenView(APIView):
             )
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -176,7 +170,6 @@ class UserProfileView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 

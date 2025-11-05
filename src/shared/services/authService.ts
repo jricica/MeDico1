@@ -80,6 +80,8 @@ const TOKEN_STORAGE_KEYS = {
 };
 
 class AuthService {
+  private refreshPromise: Promise<string> | null = null;
+
   /**
    * Guardar tokens en localStorage
    */
@@ -224,40 +226,57 @@ class AuthService {
 
   /**
    * Renovar access token usando refresh token
+   * Implementa lock para prevenir múltiples refreshes simultáneos
    */
   async refreshAccessToken(): Promise<string> {
+    // Si ya hay un refresh en progreso, retornar la misma promesa
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
     const refreshToken = this.getRefreshToken();
 
     if (!refreshToken) {
       throw new TokenRefreshError('No refresh token available');
     }
 
-    try {
-      const response = await fetch(AUTH_ENDPOINTS.refresh, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refresh: refreshToken }),
-      });
+    // Crear y guardar la promesa de refresh
+    this.refreshPromise = (async () => {
+      try {
+        const response = await fetch(AUTH_ENDPOINTS.refresh, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ refresh: refreshToken }),
+        });
 
-      if (!response.ok) {
-        // Si el refresh token es inválido, limpiar todo
+        if (!response.ok) {
+          // Si el refresh token es inválido, limpiar todo
+          this.clearAuth();
+          throw new TokenRefreshError('Refresh token expired or invalid');
+        }
+
+        const result = await response.json();
+        localStorage.setItem(TOKEN_STORAGE_KEYS.access, result.access);
+
+        return result.access;
+      } catch (error) {
+        // Solo limpiar auth si es un error de autenticación, NO en errores de red
+        if (error instanceof TypeError) {
+          // Error de red - no limpiar tokens, permitir retry
+          throw new NetworkError();
+        }
+        // Error de autenticación - limpiar tokens
         this.clearAuth();
-        throw new TokenRefreshError('Refresh token expired or invalid');
+        throw error;
+      } finally {
+        // Limpiar la promesa después de completar
+        this.refreshPromise = null;
       }
+    })();
 
-      const result = await response.json();
-      localStorage.setItem(TOKEN_STORAGE_KEYS.access, result.access);
-
-      return result.access;
-    } catch (error) {
-      this.clearAuth();
-      if (error instanceof TypeError) {
-        throw new NetworkError();
-      }
-      throw error;
-    }
+    return this.refreshPromise;
   }
 
   /**
