@@ -3,6 +3,8 @@
  * Maneja todas las operaciones relacionadas con autenticación JWT
  */
 
+import { parseAuthError, NetworkError, TokenRefreshError } from './authErrors';
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const AUTH_ENDPOINTS = {
   register: `${API_URL}/api/auth/register/`,
@@ -135,52 +137,64 @@ class AuthService {
    * Registrar nuevo usuario
    */
   async register(data: RegisterData): Promise<AuthResponse> {
-    const response = await fetch(AUTH_ENDPOINTS.register, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
+    try {
+      const response = await fetch(AUTH_ENDPOINTS.register, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(JSON.stringify(error));
+      if (!response.ok) {
+        throw await parseAuthError(response);
+      }
+
+      const result: AuthResponse = await response.json();
+      
+      // Guardar tokens y usuario
+      this.saveTokens(result.tokens);
+      this.saveUser(result.user);
+
+      return result;
+    } catch (error) {
+      if (error instanceof TypeError) {
+        throw new NetworkError();
+      }
+      throw error;
     }
-
-    const result: AuthResponse = await response.json();
-    
-    // Guardar tokens y usuario
-    this.saveTokens(result.tokens);
-    this.saveUser(result.user);
-
-    return result;
   }
 
   /**
    * Login de usuario
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await fetch(AUTH_ENDPOINTS.login, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(credentials),
-    });
+    try {
+      const response = await fetch(AUTH_ENDPOINTS.login, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(JSON.stringify(error));
+      if (!response.ok) {
+        throw await parseAuthError(response);
+      }
+
+      const result: AuthResponse = await response.json();
+      
+      // Guardar tokens y usuario
+      this.saveTokens(result.tokens);
+      this.saveUser(result.user);
+
+      return result;
+    } catch (error) {
+      if (error instanceof TypeError) {
+        throw new NetworkError();
+      }
+      throw error;
     }
-
-    const result: AuthResponse = await response.json();
-    
-    // Guardar tokens y usuario
-    this.saveTokens(result.tokens);
-    this.saveUser(result.user);
-
-    return result;
   }
 
   /**
@@ -215,27 +229,35 @@ class AuthService {
     const refreshToken = this.getRefreshToken();
 
     if (!refreshToken) {
-      throw new Error('No refresh token available');
+      throw new TokenRefreshError('No refresh token available');
     }
 
-    const response = await fetch(AUTH_ENDPOINTS.refresh, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ refresh: refreshToken }),
-    });
+    try {
+      const response = await fetch(AUTH_ENDPOINTS.refresh, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh: refreshToken }),
+      });
 
-    if (!response.ok) {
-      // Si el refresh token es inválido, limpiar todo
+      if (!response.ok) {
+        // Si el refresh token es inválido, limpiar todo
+        this.clearAuth();
+        throw new TokenRefreshError('Refresh token expired or invalid');
+      }
+
+      const result = await response.json();
+      localStorage.setItem(TOKEN_STORAGE_KEYS.access, result.access);
+
+      return result.access;
+    } catch (error) {
       this.clearAuth();
-      throw new Error('Unable to refresh token');
+      if (error instanceof TypeError) {
+        throw new NetworkError();
+      }
+      throw error;
     }
-
-    const result = await response.json();
-    localStorage.setItem(TOKEN_STORAGE_KEYS.access, result.access);
-
-    return result.access;
   }
 
   /**
@@ -264,8 +286,7 @@ class AuthService {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(JSON.stringify(error));
+      throw await parseAuthError(response);
     }
 
     const result = await response.json();
@@ -284,8 +305,7 @@ class AuthService {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(JSON.stringify(error));
+      throw await parseAuthError(response);
     }
   }
 

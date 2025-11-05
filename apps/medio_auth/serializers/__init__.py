@@ -105,38 +105,40 @@ class LoginSerializer(serializers.Serializer):
         email = attrs.get('email')
         password = attrs.get('password')
         
-        if email and password:
-            # Buscar usuario por email
-            try:
-                user = User.objects.get(email=email)
-            except User.DoesNotExist:
-                raise ValidationError({
-                    'email': 'No existe una cuenta con este email.'
-                })
-            
-            # Autenticar con username (Django usa username por defecto)
-            user = authenticate(
-                request=self.context.get('request'),
-                username=user.username,
-                password=password
-            )
-            
-            if not user:
-                raise ValidationError({
-                    'password': 'Contraseña incorrecta.'
-                })
-            
-            if not user.is_active:
-                raise ValidationError({
-                    'non_field_errors': 'Esta cuenta está desactivada.'
-                })
-            
-            attrs['user'] = user
-            return attrs
-        else:
+        if not email or not password:
             raise ValidationError({
                 'non_field_errors': 'Debe proporcionar email y contraseña.'
             })
+        
+        # Buscar usuario por email
+        try:
+            user_obj = User.objects.get(email=email)
+        except User.DoesNotExist:
+            # Usar mensaje genérico para prevenir enumeración de usuarios
+            raise ValidationError({
+                'non_field_errors': 'Credenciales inválidas. Por favor verifique su email y contraseña.'
+            })
+        
+        # Autenticar con username (Django usa username por defecto)
+        user = authenticate(
+            request=self.context.get('request'),
+            username=user_obj.username,
+            password=password
+        )
+        
+        if not user:
+            # Usar mensaje genérico para prevenir enumeración de usuarios
+            raise ValidationError({
+                'non_field_errors': 'Credenciales inválidas. Por favor verifique su email y contraseña.'
+            })
+        
+        if not user.is_active:
+            raise ValidationError({
+                'non_field_errors': 'Esta cuenta está desactivada.'
+            })
+        
+        attrs['user'] = user
+        return attrs
 
 
 class ChangePasswordSerializer(serializers.Serializer):

@@ -3,7 +3,7 @@
  * Proporciona estado global del usuario y funciones de auth
  */
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { authService, User, LoginCredentials, RegisterData } from '../services/authService';
 import { useNavigate } from 'react-router-dom';
 
@@ -29,15 +29,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Cargar usuario al montar el componente
-  useEffect(() => {
-    loadUser();
-  }, []);
-
   /**
    * Cargar información del usuario desde localStorage o servidor
    */
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -70,7 +65,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Cargar usuario al montar el componente
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]);
 
   /**
    * Login de usuario

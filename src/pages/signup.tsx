@@ -3,6 +3,7 @@ import type React from "react";
 import { useState } from "react";
 import { useNavigate, Link, Navigate } from "react-router-dom";
 import { useAuth } from "@/shared/contexts/AuthContext";
+import { AuthError } from '@/shared/services/authErrors';
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
@@ -102,22 +103,40 @@ export default function SignupForm() {
     } catch (error: any) {
       console.error('Error en registro:', error);
       
-      // Parsear errores del backend
       let errorMessage = "Ocurrió un error. Por favor intenta de nuevo.";
       
-      try {
-        const parsedError = JSON.parse(error.message);
-        if (parsedError.username) {
-          errorMessage = parsedError.username[0] || parsedError.username;
-        } else if (parsedError.email) {
-          errorMessage = parsedError.email[0] || parsedError.email;
-        } else if (parsedError.password) {
-          errorMessage = parsedError.password[0] || parsedError.password;
-        } else if (parsedError.license_number) {
-          errorMessage = parsedError.license_number[0] || parsedError.license_number;
+      // Manejar errores estructurados de AuthError
+      if (error instanceof AuthError) {
+        errorMessage = error.getUserMessage();
+      } else if (error?.message) {
+        // Intentar parsear JSON solo si parece ser un string JSON
+        if (typeof error.message === 'string' && error.message.trim().startsWith('{')) {
+          try {
+            const parsedError = JSON.parse(error.message);
+            if (parsedError.username) {
+              errorMessage = Array.isArray(parsedError.username) 
+                ? parsedError.username[0] 
+                : parsedError.username;
+            } else if (parsedError.email) {
+              errorMessage = Array.isArray(parsedError.email) 
+                ? parsedError.email[0] 
+                : parsedError.email;
+            } else if (parsedError.password) {
+              errorMessage = Array.isArray(parsedError.password) 
+                ? parsedError.password[0] 
+                : parsedError.password;
+            } else if (parsedError.license_number) {
+              errorMessage = Array.isArray(parsedError.license_number) 
+                ? parsedError.license_number[0] 
+                : parsedError.license_number;
+            }
+          } catch (parseError) {
+            // Si falla el parse, usar el mensaje original
+            errorMessage = error.message;
+          }
+        } else {
+          errorMessage = error.message;
         }
-      } catch {
-        // Si no se puede parsear, usar el mensaje por defecto
       }
 
       toast({
