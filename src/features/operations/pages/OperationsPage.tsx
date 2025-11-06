@@ -1,7 +1,8 @@
+//OperationsPage.tsx
 import { useEffect, useState } from "react";
 import { AppLayout } from "@/shared/components/layout/AppLayout";
 import { loadCSV } from "@/shared/utils/csvLoader";
-import { ChevronDown, ChevronRight, Folder, FolderOpen, Calculator, Search, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Folder, FolderOpen, Star, StarOff, Search, X } from "lucide-react";
 
 interface CSVOperation {
   codigo?: string;
@@ -77,8 +78,20 @@ const folderStructure = {
   },
 };
 
-// Tarjeta de operación con resaltado de código
-function SimpleOperationCard({ operation, index, highlightCode }: { operation: any; index: number; highlightCode?: string }) {
+// Tarjeta de operación con botón de favoritos
+function SimpleOperationCard({ 
+  operation, 
+  index, 
+  highlightCode,
+  isFavorite,
+  onToggleFavorite
+}: { 
+  operation: any; 
+  index: number; 
+  highlightCode?: string;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+}) {
   const codigo = operation?.codigo || 'N/A';
   const cirugia = operation?.cirugia || 'Sin nombre';
   const rvu = operation?.rvu || '0';
@@ -89,8 +102,19 @@ function SimpleOperationCard({ operation, index, highlightCode }: { operation: a
   
   return (
     <div className={`border rounded-lg p-4 bg-white shadow hover:shadow-lg transition-all ${isHighlighted ? 'ring-2 ring-yellow-400 bg-yellow-50' : ''}`}>
-      {/* Código en la esquina superior derecha */}
-      <div className="flex justify-end mb-2">
+      {/* Código y botón de favorito */}
+      <div className="flex justify-between items-center mb-2">
+        <button
+          onClick={onToggleFavorite}
+          className="p-1 hover:bg-gray-100 rounded transition-colors"
+          title={isFavorite ? "Quitar de favoritos" : "Agregar a favoritos"}
+        >
+          {isFavorite ? (
+            <Star className="w-5 h-5 fill-yellow-500 text-yellow-500" />
+          ) : (
+            <StarOff className="w-5 h-5 text-gray-400" />
+          )}
+        </button>
         <span className={`px-3 py-1 rounded-full text-xs font-bold ${isHighlighted ? 'bg-yellow-500 text-white animate-pulse' : 'bg-blue-600 text-white'}`}>
           {codigo}
         </span>
@@ -122,12 +146,6 @@ function SimpleOperationCard({ operation, index, highlightCode }: { operation: a
           </span>
         </p>
       </div>
-      
-      {/* Botón */}
-      <button className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 font-semibold">
-        <Calculator className="w-4 h-4" />
-        Calcular Valor
-      </button>
     </div>
   );
 }
@@ -148,6 +166,39 @@ const OperationsPage = () => {
     csvPath: string;
   }>>([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Estado para favoritos
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+
+  // Cargar favoritos del localStorage al iniciar
+  useEffect(() => {
+    const savedFavorites = localStorage.getItem('surgery-favorites');
+    if (savedFavorites) {
+      try {
+        const favArray = JSON.parse(savedFavorites);
+        setFavorites(new Set(favArray));
+      } catch (e) {
+        console.error("Error al cargar favoritos:", e);
+      }
+    }
+  }, []);
+
+  // Guardar favoritos en localStorage cuando cambien
+  const saveFavorites = (newFavorites: Set<string>) => {
+    localStorage.setItem('surgery-favorites', JSON.stringify(Array.from(newFavorites)));
+    setFavorites(newFavorites);
+  };
+
+  // Toggle favorito
+  const toggleFavorite = (codigo: string) => {
+    const newFavorites = new Set(favorites);
+    if (newFavorites.has(codigo)) {
+      newFavorites.delete(codigo);
+    } else {
+      newFavorites.add(codigo);
+    }
+    saveFavorites(newFavorites);
+  };
 
   useEffect(() => {
     async function fetchAllCSV() {
@@ -305,9 +356,15 @@ const OperationsPage = () => {
           <h1 className="text-3xl font-bold text-white mb-2">
             Base de Datos de Cirugías
           </h1>
-          <p className="text-blue-100">
-            {Object.values(csvData).reduce((total, ops) => total + ops.length, 0)} cirugías disponibles
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-blue-100">
+              {Object.values(csvData).reduce((total, ops) => total + ops.length, 0)} cirugías disponibles
+            </p>
+            <div className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-lg">
+              <Star className="w-5 h-5 fill-yellow-300 text-yellow-300" />
+              <span className="text-white font-semibold">{favorites.size} favoritos</span>
+            </div>
+          </div>
         </div>
 
         {/* Buscador por código */}
@@ -441,6 +498,8 @@ const OperationsPage = () => {
                                         operation={op}
                                         index={idx}
                                         highlightCode={isSearching ? searchCode : undefined}
+                                        isFavorite={favorites.has(op.codigo)}
+                                        onToggleFavorite={() => toggleFavorite(op.codigo)}
                                       />
                                     ))}
                                   </div>

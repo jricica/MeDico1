@@ -1,3 +1,4 @@
+//operations.tsx
 import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { loadCSV } from "@/utils/csvLoader";
@@ -70,7 +71,7 @@ const folderStructure = {
   Urologia: {
     Urología: "Urologia/Urología.csv",
   },
-  
+
   
 
 
@@ -79,7 +80,7 @@ const folderStructure = {
 };
 
 // Tarjeta de operación
-function SimpleOperationCard({ operation, index }: { operation: any; index: number }) {
+export function SimpleOperationCard({ operation, index }: { operation: any; index: number }) {
   const codigo = operation?.codigo || 'N/A';
   const cirugia = operation?.cirugia || 'Sin nombre';
   const rvu = operation?.rvu || '0';
