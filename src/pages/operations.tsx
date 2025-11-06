@@ -14,11 +14,12 @@ interface CSVOperation {
   [key: string]: any;
 }
 
-// ✅ Estructura corregida y limpia (sin duplicados ni typos)
+// ✅ Estructura completa sincronizada con csvLoader.ts
 const folderStructure = {
   Cardiovascular: {
     "Corazón": "Cardiovascular/Corazón.csv",
     "Vasos Periféricos": "Cardiovascular/Vasos_periféricos.csv",
+    "Tórax": "Cardiovascular/torax.csv",
   },
   Dermatología: {
     "Dermatología": "Dermatología/Dermatología.csv",
@@ -37,6 +38,9 @@ const folderStructure = {
   Mama: {
     "Mama": "Mama/Mama.csv",
   },
+  Maxilofacial: {
+    "Maxilofacial": "Maxilofacial/Maxilofacial.csv",
+  },
   Neurocirugía: {
     "Columna": "Neurocirugía/Columna.csv",
     "Cráneo y Columna": "Neurocirugía/Cráneo_y_columna.csv",
@@ -52,9 +56,19 @@ const folderStructure = {
     "Hombro": "Ortopedia/Hombro.csv",
     "Muñeca y Mano": "Ortopedia/Muñeca_y_mano.csv",
     "Pie": "Ortopedia/Pie.csv",
+    "Yesos y Férulas": "Ortopedia/Yesos_y_ferulas.csv",
+    "Injertos, Implantes y Replantación": "Ortopedia/ortopedia_injertos_implantes_replantacion.csv",
+    "Artroscopias": "Ortopedia/Artroscopia.csv",
   },
   Otorrino: {
     "Otorrino": "Otorrino/Otorrino.csv",
+    "Laringe y Tráqueas": "Otorrino/Laringe_y_traqueas.csv",
+    "Nariz y Senos Paranasales": "Otorrino/Nariz_y_senos_paranasales.csv",
+    "Otorrinolaringología": "Otorrino/Otorrinolaringología.csv",
+    "Tórax": "Otorrino/torax.csv",
+  },
+  Plástica: {
+    "Cirugía Plástica": "Plastica/Plastica.csv",
   },
   "Procesos Variados": {
     "Cirugía General": "Procesos_variados/Cirugía_General.csv",
