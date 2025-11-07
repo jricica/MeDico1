@@ -1,7 +1,7 @@
 // favoritesService.ts - Servicio para manejar favoritos con el backend
 import { authService } from '@/shared/services/authService';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1/medico/favorites';
+const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/medico/favorites`;
 
 export interface Favorite {
   id: number;
