@@ -362,228 +362,196 @@ const Operations = () => {
           </div>
         </div>
 
-        {/* All Operations Grid */}
+        {/* Folder Structure Navigation - Grid View */}
         <div>
-          {(() => {
-            // Flatten all operations into a single array
-            const allOperations: Array<{ op: any; specialty: string; subName: string }> = [];
-            
-            Object.entries(folderStructure).forEach(([specialty, subcategories]) => {
+          {/* Show message if no specialties match */}
+          {Object.entries(folderStructure).every(([specialty]) => {
+            if (specialtyFilter !== "all" && specialty !== specialtyFilter) {
+              return true;
+            }
+            const subcategories = folderStructure[specialty as keyof typeof folderStructure];
+            const hasSearchResults = globalSearch 
+              ? Object.values(subcategories).some(csvPath => {
+                  const operations = csvData[csvPath] || [];
+                  return operations.some(op => 
+                    op?.cirugia?.toLowerCase().includes(globalSearch.toLowerCase()) ||
+                    op?.codigo?.toLowerCase().includes(globalSearch.toLowerCase()) ||
+                    op?.especialidad?.toLowerCase().includes(globalSearch.toLowerCase())
+                  );
+                })
+              : true;
+            return !hasSearchResults;
+          }) && (
+            <div className="text-center py-12 text-muted-foreground">
+              No procedures found
+            </div>
+          )}
+
+          {/* Specialty Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(folderStructure).map(([specialty, subcategories]) => {
               // Filter by specialty if selected
               if (specialtyFilter !== "all" && specialty !== specialtyFilter) {
-                return;
+                return null;
               }
-              
-              Object.entries(subcategories).forEach(([subName, csvPath]) => {
-                const operations = csvData[csvPath] || [];
-                operations.forEach(op => {
-                  allOperations.push({ op, specialty, subName });
-                });
-              });
-            });
 
-            // Filter by global search
-            const filteredOperations = globalSearch
-              ? allOperations.filter(({ op }) =>
-                  op?.cirugia?.toLowerCase().includes(globalSearch.toLowerCase()) ||
-                  op?.codigo?.toLowerCase().includes(globalSearch.toLowerCase()) ||
-                  op?.especialidad?.toLowerCase().includes(globalSearch.toLowerCase())
-                )
-              : allOperations;
+              // Check if specialty has any matching operations in search
+              const hasSearchResults = globalSearch 
+                ? Object.values(subcategories).some(csvPath => {
+                    const operations = csvData[csvPath] || [];
+                    return operations.some(op => 
+                      op?.cirugia?.toLowerCase().includes(globalSearch.toLowerCase()) ||
+                      op?.codigo?.toLowerCase().includes(globalSearch.toLowerCase()) ||
+                      op?.especialidad?.toLowerCase().includes(globalSearch.toLowerCase())
+                    );
+                  })
+                : true;
 
-            // Pagination
-            const totalPages = Math.ceil(filteredOperations.length / itemsPerPage);
-            const startIndex = (currentPage - 1) * itemsPerPage;
-            const endIndex = startIndex + itemsPerPage;
-            const paginatedOperations = filteredOperations.slice(startIndex, endIndex);
+              if (!hasSearchResults) {
+                return null;
+              }
 
-            if (filteredOperations.length === 0) {
+              // Count total operations in specialty
+              const totalOpsInSpecialty = Object.values(subcategories).reduce((sum, csvPath) => {
+                const allOps = csvData[csvPath] || [];
+                const filteredOps = globalSearch 
+                  ? allOps.filter(op => 
+                      op?.cirugia?.toLowerCase().includes(globalSearch.toLowerCase()) ||
+                      op?.codigo?.toLowerCase().includes(globalSearch.toLowerCase()) ||
+                      op?.especialidad?.toLowerCase().includes(globalSearch.toLowerCase())
+                    )
+                  : allOps;
+                return sum + filteredOps.length;
+              }, 0);
+
               return (
-                <div className="text-center py-12 text-muted-foreground">
-                  {globalSearch || specialtyFilter !== "all" ? "No procedures found" : "No procedures available"}
-                </div>
-              );
-            }
+                <div key={specialty} className="col-span-full">
+                  {/* Specialty Card */}
+                  <button
+                    onClick={() => toggleSpecialty(specialty)}
+                    className="w-full border rounded-lg p-6 hover:border-primary transition-colors bg-card text-left group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+                        {expandedSpecialties[specialty] ? (
+                          <FolderOpen className="w-8 h-8 text-primary" />
+                        ) : (
+                          <Folder className="w-8 h-8 text-primary" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-semibold mb-1">{specialty}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {totalOpsInSpecialty} procedure{totalOpsInSpecialty !== 1 ? 's' : ''} • {Object.keys(subcategories).length} categor{Object.keys(subcategories).length !== 1 ? 'ies' : 'y'}
+                        </p>
+                      </div>
+                      {expandedSpecialties[specialty] ? (
+                        <ChevronDown className="w-6 h-6 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="w-6 h-6 text-muted-foreground" />
+                      )}
+                    </div>
+                  </button>
 
-            return (
-              <>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {startIndex + 1}-{Math.min(endIndex, filteredOperations.length)} of {filteredOperations.length} procedure{filteredOperations.length !== 1 ? 's' : ''}
-                  </div>
-                  {totalPages > 1 && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        className="px-3 py-1 border rounded hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                      >
-                        Previous
-                      </button>
-                      <span className="px-3 py-1 text-sm">
-                        Page {currentPage} of {totalPages}
-                      </span>
-                      <button
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                        className="px-3 py-1 border rounded hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                      >
-                        Next
-                      </button>
+                  {/* Subcategories Grid */}
+                  {expandedSpecialties[specialty] && (
+                    <div className="mt-4 ml-4 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {Object.entries(subcategories).map(([subName, csvPath]) => {
+                          const allOperations = csvData[csvPath] || [];
+                          const operations = globalSearch 
+                            ? allOperations.filter(op => 
+                                op?.cirugia?.toLowerCase().includes(globalSearch.toLowerCase()) ||
+                                op?.codigo?.toLowerCase().includes(globalSearch.toLowerCase()) ||
+                                op?.especialidad?.toLowerCase().includes(globalSearch.toLowerCase())
+                              )
+                            : allOperations;
+                          
+                          const subKey = `${specialty}-${subName}`;
+                          
+                          // Skip if no results in search
+                          if (globalSearch && operations.length === 0) {
+                            return null;
+                          }
+                          
+                          return (
+                            <button
+                              key={subKey}
+                              onClick={() => toggleSubcategory(subKey)}
+                              className="border rounded-lg p-4 hover:border-primary transition-colors bg-card text-left group"
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="p-2 bg-muted rounded group-hover:bg-primary/10 transition-colors">
+                                  <Stethoscope className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-medium text-sm mb-1 truncate">{subName}</h4>
+                                  <p className="text-xs text-muted-foreground">
+                                    {operations.length} procedure{operations.length !== 1 ? 's' : ''}
+                                  </p>
+                                </div>
+                                {expandedSubcategories[subKey] ? (
+                                  <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Operations Grid - Shown for expanded subcategories */}
+                      {Object.entries(subcategories).map(([subName, csvPath]) => {
+                        const subKey = `${specialty}-${subName}`;
+                        
+                        if (!expandedSubcategories[subKey]) {
+                          return null;
+                        }
+
+                        const allOperations = csvData[csvPath] || [];
+                        const operations = globalSearch 
+                          ? allOperations.filter(op => 
+                              op?.cirugia?.toLowerCase().includes(globalSearch.toLowerCase()) ||
+                              op?.codigo?.toLowerCase().includes(globalSearch.toLowerCase()) ||
+                              op?.especialidad?.toLowerCase().includes(globalSearch.toLowerCase())
+                            )
+                          : allOperations;
+
+                        return (
+                          <div key={`ops-${subKey}`} className="space-y-3">
+                            <div className="flex items-center gap-2 px-2">
+                              <Stethoscope className="w-4 h-4 text-primary" />
+                              <h4 className="font-semibold text-base">{subName}</h4>
+                              <span className="text-sm text-muted-foreground">({operations.length})</span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                              {operations.map((op, idx) => {
+                                const codigo = String(op?.codigo || '').trim();
+                                const isFav = favorites.has(codigo);
+                                
+                                return (
+                                  <SimpleOperationCard
+                                    key={`${codigo}-${idx}`}
+                                    operation={op}
+                                    index={idx}
+                                    isFavorite={isFav}
+                                    isLoading={loadingFavorite === codigo}
+                                    onToggleFavorite={() => handleToggleFavorite(codigo, op)}
+                                    onCalculate={() => handleCalculateValue(op)}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {paginatedOperations.map(({ op, specialty, subName }, idx) => {
-                    const codigo = String(op?.codigo || '').trim();
-                    const isFav = favorites.has(codigo);
-
-                    return (
-                      <SimpleOperationCard
-                        key={`${codigo}-${idx}`}
-                        operation={op}
-                        index={idx}
-                        isFavorite={isFav}
-                        isLoading={loadingFavorite === codigo}
-                        onToggleFavorite={() => handleToggleFavorite(codigo, op)}
-                        onCalculate={() => handleCalculateValue(op)}
-                      />
-                    );
-                  })}
-                </div>
-                {/* Bottom Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex justify-center gap-2 mt-6">
-                    <button
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="px-4 py-2 border rounded hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Previous
-                    </button>
-                    <span className="px-4 py-2 text-sm">
-                      Page {currentPage} of {totalPages}
-                    </span>
-                    <button
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                      className="px-4 py-2 border rounded hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
-              </>
-            );
-          })()}
-        </div>
-
-        {/* Old Navigation - Removed */}
-        <div className="hidden space-y-2">
-          {Object.entries(folderStructure).map(([specialty, subcategories]) => (
-            <div key={specialty} className="border rounded-lg overflow-hidden">
-              {/* Specialty */}
-              <button
-                onClick={() => toggleSpecialty(specialty)}
-                className="w-full flex items-center gap-3 p-4 hover:bg-accent transition-colors"
-              >
-                {expandedSpecialties[specialty] ? (
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                )}
-                <Folder className="w-5 h-5 text-muted-foreground" />
-                <span className="font-medium text-base flex-1 text-left">{specialty}</span>
-              </button>
-
-              {/* Subcategories */}
-              {expandedSpecialties[specialty] && (
-                <div className="bg-muted/30">
-                  {Object.entries(subcategories).map(([subName, csvPath]) => {
-                    const allOperations = csvData[csvPath] || [];
-                    const operations = globalSearch 
-                      ? allOperations.filter(op => 
-                          op?.cirugia?.toLowerCase().includes(globalSearch.toLowerCase()) ||
-                          op?.codigo?.toLowerCase().includes(globalSearch.toLowerCase()) ||
-                          op?.especialidad?.toLowerCase().includes(globalSearch.toLowerCase())
-                        )
-                      : allOperations;
-                    
-                    const subKey = `${specialty}-${subName}`;
-                    
-                    // Auto-expand if there are search results
-                    if (globalSearch && operations.length > 0 && !expandedSubcategories[subKey]) {
-                      setExpandedSubcategories(prev => ({ ...prev, [subKey]: true }));
-                      if (!expandedSpecialties[specialty]) {
-                        setExpandedSpecialties(prev => ({ ...prev, [specialty]: true }));
-                      }
-                    }
-                    
-                    if (globalSearch && operations.length === 0) {
-                      return null;
-                    }
-                    
-                    return (
-                      <div key={subKey} className="border-t">
-                        {/* Subcategory */}
-                        <button
-                          onClick={() => toggleSubcategory(subKey)}
-                          className="w-full flex items-center gap-3 p-3 pl-8 hover:bg-accent transition-colors"
-                        >
-                          {expandedSubcategories[subKey] ? (
-                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                          )}
-                          <FolderOpen className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm flex-1 text-left">{subName}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {operations.length}
-                          </span>
-                        </button>
-
-                        {/* Tarjetas de operaciones */}
-                        {expandedSubcategories[subKey] && (
-                          <div className="p-6 bg-background">
-                            {operations.length === 0 ? (
-                              <p className="text-center text-muted-foreground py-8">
-                                No procedures in this category
-                              </p>
-                            ) : (
-                              <>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                  {operations.map((op, idx) => {
-                                    const codigo = String(op?.codigo || '').trim();
-                                    const isFav = favorites.has(codigo);
-                                    
-                                    return (
-                                      <SimpleOperationCard
-                                        key={idx}
-                                        operation={op}
-                                        index={idx}
-                                        isFavorite={isFav}
-                                        isLoading={loadingFavorite === codigo}
-                                        onToggleFavorite={() => handleToggleFavorite(codigo, op)}
-                                        onCalculate={() => handleCalculateValue(op)}
-                                      />
-                                    );
-                                  })}
-                                </div>
-
-                                <p className="mt-6 text-center text-gray-600 dark:text-gray-400 font-semibold">
-                                  📊 Mostrando {operations.length} cirugías
-                                </p>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ))}
+              );
+            })}
+          </div>
         </div>
       </div>
 
