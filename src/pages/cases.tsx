@@ -4,6 +4,8 @@ import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
 import { surgicalCaseService } from "@/services/surgicalCaseService";
+import { notificationService } from "@/services/notificationService";
+import { useToast } from "@/shared/hooks/useToast";
 import type { SurgicalCase } from "@/types/surgical-case";
 import { Link } from "react-router-dom";
 import {
@@ -11,8 +13,6 @@ import {
   Plus,
   Calendar,
   Hospital,
-  DollarSign,
-  FileText,
   Eye,
   Edit,
   Trash2,
@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 
 const CasesPage = () => {
+  const { toast } = useToast();
   const [cases, setCases] = useState<SurgicalCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +41,7 @@ const CasesPage = () => {
       setCases(data);
     } catch (err: any) {
       setError(err.message || 'Error al cargar casos');
+      toast.error('Error', 'No se pudieron cargar los casos');
     } finally {
       setLoading(false);
     }
@@ -47,7 +49,7 @@ const CasesPage = () => {
 
   const handleDelete = async (id: number, patientName: string) => {
     const confirmed = window.confirm(
-      `Are you sure you want to delete the case for ${patientName}?\n\nThis action cannot be undone.`
+      `¿Estás seguro de eliminar el caso de ${patientName}?\n\nEsta acción no se puede deshacer.`
     );
     
     if (!confirmed) return;
@@ -55,9 +57,19 @@ const CasesPage = () => {
     setDeletingId(id);
     try {
       await surgicalCaseService.deleteCase(id);
+      
+      // Cancelar notificación programada
+      notificationService.cancelNotification(id);
+      
       setCases(cases.filter(c => c.id !== id));
+      
+      // Mostrar toast de éxito
+      toast.success(
+        'Caso eliminado',
+        `El caso de ${patientName} fue eliminado exitosamente`
+      );
     } catch (err: any) {
-      alert('Error deleting case: ' + err.message);
+      toast.error('Error', 'No se pudo eliminar el caso');
     } finally {
       setDeletingId(null);
     }
@@ -128,9 +140,9 @@ const CasesPage = () => {
         <Card className="border-destructive">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="w-16 h-16 text-destructive mb-4" />
-            <h2 className="text-2xl font-semibold mb-2">Error loading cases</h2>
+            <h2 className="text-2xl font-semibold mb-2">Error al cargar casos</h2>
             <p className="text-muted-foreground mb-6">{error}</p>
-            <Button onClick={fetchCases}>Try Again</Button>
+            <Button onClick={fetchCases}>Intentar de nuevo</Button>
           </CardContent>
         </Card>
       </AppLayout>
@@ -143,15 +155,15 @@ const CasesPage = () => {
         {/* Header with Actions */}
         <div className="flex items-center justify-between pb-4 border-b">
           <div>
-            <h1 className="text-3xl font-semibold mb-1 tracking-tight">Surgical Cases</h1>
+            <h1 className="text-3xl font-semibold mb-1 tracking-tight">Casos Quirúrgicos</h1>
             <p className="text-muted-foreground">
-              {filteredCases.length} of {cases.length} case{cases.length !== 1 ? 's' : ''}
+              {filteredCases.length} de {cases.length} caso{cases.length !== 1 ? 's' : ''}
             </p>
           </div>
           <Button asChild>
             <Link to="/cases/new">
               <Plus className="w-4 h-4 mr-2" />
-              New Case
+              Nuevo Caso
             </Link>
           </Button>
         </div>
@@ -163,7 +175,7 @@ const CasesPage = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
                 type="text"
-                placeholder="Search by patient name, ID, or hospital..."
+                placeholder="Buscar por paciente, ID o hospital..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -175,28 +187,28 @@ const CasesPage = () => {
                 size="sm"
                 onClick={() => setStatusFilter("all")}
               >
-                All
+                Todos
               </Button>
               <Button
                 variant={statusFilter === "scheduled" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setStatusFilter("scheduled")}
               >
-                Scheduled
+                Programados
               </Button>
               <Button
                 variant={statusFilter === "completed" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setStatusFilter("completed")}
               >
-                Completed
+                Completados
               </Button>
               <Button
                 variant={statusFilter === "paid" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setStatusFilter("paid")}
               >
-                Paid
+                Pagados
               </Button>
             </div>
           </div>
@@ -208,15 +220,15 @@ const CasesPage = () => {
             <CardContent className="flex flex-col items-center justify-center py-16">
               <Briefcase className="w-20 h-20 text-gray-300 dark:text-gray-600 mb-4" />
               <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-                No cases yet
+                No hay casos aún
               </h3>
               <p className="text-gray-500 dark:text-gray-400 text-lg mb-6 text-center max-w-md">
-                Start by creating your first surgical case to track procedures and valuations
+                Comienza creando tu primer caso quirúrgico
               </p>
               <Button asChild size="lg">
                 <Link to="/cases/new">
                   <Plus className="w-5 h-5 mr-2" />
-                  Create First Case
+                  Crear Primer Caso
                 </Link>
               </Button>
             </CardContent>
@@ -225,9 +237,9 @@ const CasesPage = () => {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Filter className="w-16 h-16 text-muted-foreground mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No cases found</h3>
+              <h3 className="text-xl font-semibold mb-2">No se encontraron casos</h3>
               <p className="text-muted-foreground text-center">
-                Try adjusting your search or filter criteria
+                Intenta ajustar los filtros de búsqueda
               </p>
             </CardContent>
           </Card>
@@ -258,15 +270,15 @@ const CasesPage = () => {
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div>
-                      <div className="text-xs text-muted-foreground mb-1">Procedures</div>
+                      <div className="text-xs text-muted-foreground mb-1">Procedimientos</div>
                       <div className="text-lg font-semibold">{surgicalCase.procedure_count || 0}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground mb-1">Total RVU</div>
+                      <div className="text-xs text-muted-foreground mb-1">RVU Total</div>
                       <div className="text-lg font-semibold">{surgicalCase.total_rvu || 0}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground mb-1">Value</div>
+                      <div className="text-xs text-muted-foreground mb-1">Valor</div>
                       <div className="text-lg font-semibold">
                         ${(surgicalCase.total_value || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                       </div>
@@ -285,13 +297,13 @@ const CasesPage = () => {
                     <Button asChild variant="ghost" size="sm" className="flex-1">
                       <Link to={`/cases/${surgicalCase.id}`}>
                         <Eye className="w-4 h-4 mr-1" />
-                        View
+                        Ver
                       </Link>
                     </Button>
                     <Button asChild variant="ghost" size="sm" className="flex-1">
                       <Link to={`/cases/${surgicalCase.id}/edit`}>
                         <Edit className="w-4 h-4 mr-1" />
-                        Edit
+                        Editar
                       </Link>
                     </Button>
                     <Button
