@@ -16,6 +16,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'name',
+            'role',  # Campo agregado
             'phone', 'specialty', 'license_number', 'hospital_default',
             'avatar', 'signature_image', 'is_verified', 'theme_preference',
             'is_profile_complete', 'created_at', 'updated_at'

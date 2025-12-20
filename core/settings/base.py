@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'apps.communication.apps.CommunicationConfig',
     'apps.invoice.apps.InvoiceConfig',
     'apps.payment.apps.PaymentConfig',
+    'apps.advertising.apps.AdvertisingConfig',
 ]
 
 MIDDLEWARE = [

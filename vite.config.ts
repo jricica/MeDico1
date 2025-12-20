@@ -22,6 +22,25 @@ export default defineConfig({
     strictPort: true,
     host: true,
     origin: 'http://localhost:5173',
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('❌ Proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('➡️  Proxy request:', req.method, req.url, '→ http://localhost:8000' + req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req, _res) => {
+            console.log('⬅️  Proxy response:', proxyRes.statusCode, req.url);
+          });
+        },
+      },
+    },
   },
   build: {
     outDir: 'dist',

@@ -11,6 +11,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
@@ -79,8 +80,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const response = await authService.login(credentials);
       setUser(response.user);
       
-      // Navegar al dashboard después del login exitoso
-      navigate('/');
+      // Redirigir según el rol del usuario
+      if (response.user.role === 0) {
+        // Es admin - redirigir al panel de administración
+        navigate('/admin');
+      } else {
+        // Es usuario normal - redirigir al dashboard
+        navigate('/');
+      }
     } catch (error) {
       // Re-throw para que el componente pueda manejar el error
       throw error;
@@ -95,7 +102,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const response = await authService.register(data);
       setUser(response.user);
       
-      // Navegar al dashboard después del registro exitoso
+      // Los usuarios registrados siempre son role=1 (normal)
+      // Redirigir al dashboard
       navigate('/');
     } catch (error) {
       throw error;
@@ -147,6 +155,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     user,
     loading,
     isAuthenticated: !!user,
+    isAdmin: user?.role === 0,
     login,
     register,
     logout,

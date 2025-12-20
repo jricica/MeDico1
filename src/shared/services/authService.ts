@@ -2,6 +2,7 @@
  * Servicio de Autenticación para MeDico
  * Maneja todas las operaciones relacionadas con autenticación JWT
  */
+//authService.ts
 
 import { parseAuthError, NetworkError, TokenRefreshError } from './authErrors';
 
@@ -23,6 +24,7 @@ export interface User {
   first_name: string;
   last_name: string;
   full_name: string;
+  role: number;
   name: string;  // Alias de full_name para compatibilidad
   phone?: string;
   specialty?: string;

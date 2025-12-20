@@ -7,6 +7,19 @@ class CustomUser(AbstractUser):
     Modelo de usuario personalizado para MeDico
     Extiende AbstractUser con campos específicos para profesionales médicos
     """
+    # ROL DEL USUARIO
+    ROLE_CHOICES = [
+        (0, 'Admin'),
+        (1, 'User'),
+    ]
+    
+    role = models.IntegerField(
+        choices=ROLE_CHOICES,
+        default=1,
+        verbose_name="Rol",
+        help_text="Rol del usuario en el sistema (0=Admin, 1=User)"
+    )
+    
     # Información de contacto
     phone = models.CharField(
         max_length=20, 
@@ -133,3 +146,13 @@ class CustomUser(AbstractUser):
             self.phone
         ]
         return all(required_fields)
+    
+    @property
+    def is_admin(self):
+        """Verifica si el usuario es administrador"""
+        return self.role == 0
+    
+    @property
+    def role_name(self):
+        """Devuelve el nombre del rol"""
+        return dict(self.ROLE_CHOICES).get(self.role, 'Unknown')

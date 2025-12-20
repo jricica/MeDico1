@@ -1,12 +1,19 @@
+// src/core/router/AppRouter.tsx
+
 import { Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "@/shared/components/auth/ProtectedRoute";
 
-// Auth pages (new custom auth)
+// Admin components
+import { AdminLayout } from "@/admin/components/AdminLayout";
+import AdminDashboard from "@/admin/pages/Dashboard";
+import Clients from "@/admin/pages/Clients"; // ← Agregar esta línea
+
+// Auth pages
 import LoginPage from "@/pages/login";
 import SignupForm from "@/pages/signup";
 import LogoutPage from "@/pages/logout";
 
-// Main pages (updated with custom auth)
+// Main pages
 import Index from "@/pages/index";
 import CasesPage from "@/pages/cases";
 import NewCase from "@/pages/cases/new";
@@ -27,6 +34,19 @@ export const AppRouter = () => {
       <Route path='/login' element={<LoginPage />} />
       <Route path='/signup' element={<SignupForm />} />
       <Route path='/logout' element={<LogoutPage />} />
+
+      {/* Admin routes */}
+      <Route
+        path='/admin'
+        element={
+          <ProtectedRoute requireAdmin>
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<AdminDashboard />} />
+        <Route path='clients' element={<Clients />} /> {/* ← Agregar esta línea */}
+      </Route>
 
       {/* Protected routes */}
       <Route path='/' element={<ProtectedRoute><Index /></ProtectedRoute>} />
