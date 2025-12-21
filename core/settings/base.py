@@ -152,3 +152,7 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 CSRF_COOKIE_SECURE = False  # Para desarrollo local
 CSRF_COOKIE_HTTPONLY = False  # Permitir acceso desde JavaScript
+
+# Tamaño máximo de archivo subido (20MB)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024  # 20MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024  # 20MB

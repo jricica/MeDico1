@@ -1,3 +1,5 @@
+// src/shared/components/auth/ProtectedRoute.tsx
+
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/shared/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
@@ -25,22 +27,12 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Si la ruta requiere admin
-  if (requireAdmin) {
-    // Si NO es admin, redirigir al dashboard de usuario
-    if (!isAdmin) {
-      return <Navigate to="/" replace />;
-    }
-    // Si es admin, permitir acceso
-    return <>{children}</>;
+  // Si la ruta REQUIERE ADMIN y el usuario NO es admin → BLOQUEAR
+  if (requireAdmin && !isAdmin) {
+    console.warn('⛔ Intento de acceso no autorizado a ruta de admin');
+    return <Navigate to="/" replace />;
   }
 
-  // Si NO requiere admin (es ruta de usuario normal)
-  // Si ES admin, redirigir al panel de admin
-  if (isAdmin) {
-    return <Navigate to="/admin" replace />;
-  }
-
-  // Si es usuario normal, permitir acceso
+  // Si llegó aquí, el usuario tiene permiso
   return <>{children}</>;
 }

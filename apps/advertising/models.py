@@ -1,7 +1,10 @@
 from django.db import models
 from django.conf import settings
 from django.core.validators import URLValidator
+from django.db.models.signals import post_delete, pre_save
+from django.dispatch import receiver
 from decimal import Decimal
+import os
 
 
 class Client(models.Model):
@@ -317,3 +320,48 @@ class Advertisement(models.Model):
         """Incrementa el contador de clicks"""
         self.clicks += 1
         self.save(update_fields=['clicks'])
+
+
+# =============================================================================
+# SIGNALS PARA LIMPIEZA AUTOMÁTICA DE IMÁGENES
+# =============================================================================
+
+@receiver(post_delete, sender=Advertisement)
+def delete_advertisement_image_on_delete(sender, instance, **kwargs):
+    """
+    Elimina el archivo de imagen del sistema cuando se elimina un Advertisement.
+    Se ejecuta DESPUÉS de eliminar el registro de la base de datos.
+    """
+    if instance.image:
+        try:
+            if os.path.isfile(instance.image.path):
+                os.remove(instance.image.path)
+                print(f"✓ Imagen eliminada: {instance.image.path}")
+        except Exception as e:
+            print(f"✗ Error al eliminar imagen: {e}")
+
+
+@receiver(pre_save, sender=Advertisement)
+def delete_old_image_on_update(sender, instance, **kwargs):
+    """
+    Elimina la imagen ANTIGUA cuando se sube una NUEVA al editar.
+    Se ejecuta ANTES de guardar el nuevo registro.
+    Evita acumulación de imágenes obsoletas.
+    """
+    if not instance.pk:
+        return
+    
+    try:
+        old_instance = Advertisement.objects.get(pk=instance.pk)
+        
+        if old_instance.image and old_instance.image != instance.image:
+            if os.path.isfile(old_instance.image.path):
+                try:
+                    os.remove(old_instance.image.path)
+                    print(f"✓ Imagen antigua eliminada: {old_instance.image.path}")
+                except Exception as e:
+                    print(f"✗ Error al eliminar imagen antigua: {e}")
+    except Advertisement.DoesNotExist:
+        pass
+    except Exception as e:
+        print(f"✗ Error en signal pre_save: {e}")

@@ -26,6 +26,7 @@ import Favorites from "@/pages/favorites";
 import HistoryPage from "@/pages/history";
 import SettingsPage from "@/pages/settings";
 import DebugFavorites from "@/pages/debug-favorites";
+import Advertisements from "@/admin/pages/Advertisements";
 
 export const AppRouter = () => {
   return (
@@ -36,17 +37,18 @@ export const AppRouter = () => {
       <Route path='/logout' element={<LogoutPage />} />
 
       {/* Admin routes */}
-      <Route
-        path='/admin'
-        element={
-          <ProtectedRoute requireAdmin>
-            <AdminLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<AdminDashboard />} />
-        <Route path='clients' element={<Clients />} /> {/* ← Agregar esta línea */}
-      </Route>
+        <Route
+          path='/admin'
+          element={
+            <ProtectedRoute requireAdmin>
+              <AdminLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<AdminDashboard />} />
+          <Route path='clients' element={<Clients />} />
+          <Route path='advertisements' element={<Advertisements />} /> {/* ← Mover AQUÍ */}
+        </Route>
 
       {/* Protected routes */}
       <Route path='/' element={<ProtectedRoute><Index /></ProtectedRoute>} />
@@ -61,6 +63,7 @@ export const AppRouter = () => {
       <Route path='/history' element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
       <Route path='/settings' element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       <Route path='/debug-favorites' element={<ProtectedRoute><DebugFavorites /></ProtectedRoute>} />
+      
     </Routes>
   );
 };
