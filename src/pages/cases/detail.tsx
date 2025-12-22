@@ -1,3 +1,4 @@
+//src/pages/cases/detail.tsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { AppLayout } from "@/shared/components/layout/AppLayout";

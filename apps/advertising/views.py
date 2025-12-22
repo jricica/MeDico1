@@ -143,16 +143,36 @@ class AdvertisementViewSet(viewsets.ModelViewSet):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_active_ads(request):
+    """
+    Endpoint público para obtener anuncios activos.
+    
+    Filtros por placement:
+    - home_banner: Solo clientes GOLD
+    - sidebar: Clientes GOLD y SILVER
+    - between_content: Clientes GOLD y SILVER
+    - footer: Clientes GOLD y SILVER
+    - popup: Solo clientes GOLD
+    """
     placement = request.query_params.get('placement', 'home_banner')
     today = timezone.now().date()
+    
+    # Determinar qué planes son elegibles según el placement
+    if placement in ['home_banner', 'popup']:
+        # Solo Gold para ubicaciones premium
+        allowed_plans = ['gold']
+    else:
+        # Gold y Silver para otras ubicaciones
+        allowed_plans = ['gold', 'silver']
+    
     ads = Advertisement.objects.filter(
         status='active',
         placement=placement,
         start_date__lte=today,
         end_date__gte=today,
-        client__plan='gold',
+        client__plan__in=allowed_plans,
         client__status='active'
     ).select_related('client').order_by('-priority')[:5]
+    
     serializer = ActiveAdvertisementSerializer(ads, many=True, context={'request': request})
     return Response(serializer.data)
 

@@ -1,3 +1,5 @@
+
+# apps/medico/views/__init__.py
 from django.shortcuts import render
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated

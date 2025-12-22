@@ -57,6 +57,11 @@ class SurgicalCaseListSerializer(serializers.ModelSerializer):
     primary_specialty = serializers.CharField(read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     
+    # Nuevos campos de estado
+    is_operated = serializers.BooleanField(default=False)
+    is_billed = serializers.BooleanField(default=False)
+    is_paid = serializers.BooleanField(default=False)
+    
     class Meta:
         model = SurgicalCase
         fields = [
@@ -67,6 +72,9 @@ class SurgicalCaseListSerializer(serializers.ModelSerializer):
             'hospital_name',
             'status',
             'status_display',
+            'is_operated',
+            'is_billed',
+            'is_paid',
             'total_rvu',
             'total_value',
             'procedure_count',
@@ -102,6 +110,11 @@ class SurgicalCaseDetailSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     
+    # Nuevos campos de estado
+    is_operated = serializers.BooleanField(default=False)
+    is_billed = serializers.BooleanField(default=False)
+    is_paid = serializers.BooleanField(default=False)
+    
     class Meta:
         model = SurgicalCase
         fields = [
@@ -117,6 +130,9 @@ class SurgicalCaseDetailSerializer(serializers.ModelSerializer):
             'surgery_time',
             'status',
             'status_display',
+            'is_operated',
+            'is_billed',
+            'is_paid',
             'notes',
             'diagnosis',
             'procedures',
@@ -136,6 +152,11 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
     
     procedures = CaseProcedureSerializer(many=True, required=False)
     
+    # Nuevos campos de estado (opcionales en creación/actualización)
+    is_operated = serializers.BooleanField(default=False, required=False)
+    is_billed = serializers.BooleanField(default=False, required=False)
+    is_paid = serializers.BooleanField(default=False, required=False)
+    
     class Meta:
         model = SurgicalCase
         fields = [
@@ -150,6 +171,9 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
             'status',
             'notes',
             'diagnosis',
+            'is_operated',
+            'is_billed',
+            'is_paid',
             'procedures',
             'created_at',
             'updated_at',
@@ -161,6 +185,26 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
         if not value or not value.strip():
             raise serializers.ValidationError("El nombre del paciente es requerido")
         return value.strip()
+    
+    def validate(self, data):
+        """Validaciones de lógica de negocio para estados"""
+        is_operated = data.get('is_operated', getattr(self.instance, 'is_operated', False) if self.instance else False)
+        is_billed = data.get('is_billed', getattr(self.instance, 'is_billed', False) if self.instance else False)
+        is_paid = data.get('is_paid', getattr(self.instance, 'is_paid', False) if self.instance else False)
+        
+        # No se puede facturar sin operar
+        if is_billed and not is_operated:
+            raise serializers.ValidationError({
+                'is_billed': 'No se puede marcar como facturado sin estar operado'
+            })
+        
+        # No se puede cobrar sin facturar
+        if is_paid and not is_billed:
+            raise serializers.ValidationError({
+                'is_paid': 'No se puede marcar como cobrado sin estar facturado'
+            })
+        
+        return data
     
     def create(self, validated_data):
         """Crear caso con procedimientos anidados"""

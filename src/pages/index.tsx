@@ -1,17 +1,13 @@
 // src/pages/index.tsx
 
 import { AppLayout } from "@/shared/components/layout/AppLayout";
-import { DashboardStats } from "@/shared/components/ui/DashboardStats";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { useAuth } from "@/shared/contexts/AuthContext";
 import { 
-  Calculator, 
-  ListChecks, 
   Star, 
   Briefcase, 
   TrendingUp, 
-  DollarSign, 
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -306,8 +302,7 @@ const Index = () => {
                       {case_.patient_name}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {case_.procedure_count} procedure{case_.procedure_count !== 1 ? 's' : ''} • 
-                      {case_.total_rvu} RVU
+                      {case_.procedure_count} procedure{case_.procedure_count !== 1 ? 's' : ''} • {case_.total_rvu} RVU
                     </div>
                   </div>
                   <div className="text-right">

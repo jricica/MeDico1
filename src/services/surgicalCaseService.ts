@@ -1,242 +1,229 @@
-/**
- * Service for Surgical Cases API
- */
-import { authService } from '@/shared/services/authService';
-import type {
-  SurgicalCase,
-  SurgicalCaseCreate,
-  SurgicalCaseUpdate,
-  CaseStats,
-  CaseFilters,
-  CaseProcedure,
-} from '@/types/surgical-case';
+// src/services/surgicalCaseService.ts
 
-const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/medico/cases`;
+import { authService } from '@/shared/services/authService';
+import type { SurgicalCase, CreateCaseData, UpdateCaseData, CaseStats } from '@/types/surgical-case';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 class SurgicalCaseService {
   /**
-   * Get all cases with optional filters
+   * Helper method to handle responses and errors properly
    */
-  async getCases(filters?: CaseFilters): Promise<SurgicalCase[]> {
+  private async handleResponse<T>(response: Response): Promise<T> {
+    const contentType = response.headers.get('content-type');
+    
+    // Si la respuesta no es JSON, probablemente es un error HTML
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('Non-JSON response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: response.url,
+        contentType,
+        body: text.substring(0, 500)
+      });
+      
+      throw new Error(
+        `Error del servidor: La API devolvió ${response.status} ${response.statusText}. ` +
+        `Verifica que el endpoint exista en Django y que el servidor esté corriendo.`
+      );
+    }
+
+    // Si hay un error HTTP, intenta parsear el JSON de error
+    if (!response.ok) {
+      try {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || errorData.message || `Error ${response.status}: ${response.statusText}`);
+      } catch (e) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+    }
+
+    return await response.json();
+  }
+
+  /**
+   * Get all surgical cases
+   */
+  async getCases(): Promise<SurgicalCase[]> {
     try {
-      const params = new URLSearchParams();
-      
-      if (filters?.status) params.append('status', filters.status);
-      if (filters?.hospital) params.append('hospital', filters.hospital.toString());
-      if (filters?.date_from) params.append('date_from', filters.date_from);
-      if (filters?.date_to) params.append('date_to', filters.date_to);
-      if (filters?.search) params.append('search', filters.search);
-      
-      const url = `${API_BASE_URL}/?${params.toString()}`;
-      const response = await authService.authenticatedFetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`Error al obtener casos: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      // Handle paginated response from DRF
-      if (data && typeof data === 'object' && 'results' in data) {
-        return Array.isArray(data.results) ? data.results : [];
-      }
-      
-      // Handle direct array response (if pagination is disabled)
-      return Array.isArray(data) ? data : [];
-    } catch (error) {
+      const response = await authService.authenticatedFetch(
+        `${API_URL}/api/v1/medico/cases/`
+      );
+      return await this.handleResponse<SurgicalCase[]>(response);
+    } catch (error: any) {
       console.error('Error fetching cases:', error);
       throw error;
     }
   }
 
   /**
-   * Get a single case by ID
+   * Get a single surgical case by ID
    */
   async getCase(id: number): Promise<SurgicalCase> {
     try {
-      const response = await authService.authenticatedFetch(`${API_BASE_URL}/${id}/`);
-      
-      if (!response.ok) {
-        throw new Error(`Error al obtener caso: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
+      const response = await authService.authenticatedFetch(
+        `${API_URL}/api/v1/medico/cases/${id}/`
+      );
+      return await this.handleResponse<SurgicalCase>(response);
+    } catch (error: any) {
       console.error('Error fetching case:', error);
       throw error;
     }
   }
 
   /**
-   * Create a new case
+   * Get statistics for the dashboard
    */
-  async createCase(data: SurgicalCaseCreate): Promise<SurgicalCase> {
+  async getStats(): Promise<CaseStats> {
     try {
-      console.log('Creating case with data:', data);
-      const response = await authService.authenticatedFetch(`${API_BASE_URL}/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
+      const response = await authService.authenticatedFetch(
+        `${API_URL}/api/v1/medico/cases/stats/`
+      );
 
-      console.log('Create case response status:', response.status, response.ok);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Create case error response:', errorText);
-        try {
-          const errorJson = JSON.parse(errorText);
-          throw new Error(JSON.stringify(errorJson, null, 2));
-        } catch {
-          throw new Error(errorText || 'Error al crear caso');
-        }
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('Stats endpoint returned non-JSON response');
+        return {
+          total_cases: 0,
+          total_procedures: 0,
+          total_value: 0,
+          cases_by_status: {},
+          cases_by_specialty: {},
+          recent_cases: []
+        };
       }
 
-      return await response.json();
+      const data = await response.json();
+      
+      const transformedData: CaseStats = {
+        total_cases: data.total_cases,
+        total_procedures: data.total_procedures,
+        total_value: data.total_value,
+        cases_by_status: data.cases_by_status || {},
+        cases_by_specialty: Object.entries(data.cases_by_specialty || {}).reduce((acc, [key, count]) => {
+          acc[key] = { count: count as number, total_value: 0 };
+          return acc;
+        }, {} as Record<string, { count: number; total_value: number }>),
+        recent_cases: data.recent_cases || []
+      };
+      
+      return transformedData;
     } catch (error) {
+      console.error('Error fetching stats:', error);
+      return {
+        total_cases: 0,
+        total_procedures: 0,
+        total_value: 0,
+        cases_by_status: {},
+        cases_by_specialty: {},
+        recent_cases: []
+      };
+    }
+  }
+
+  /**
+   * Create a new surgical case
+   */
+  async createCase(data: CreateCaseData): Promise<SurgicalCase> {
+    try {
+      console.log('Creating case with data:', data);
+      
+      const response = await authService.authenticatedFetch(
+        `${API_URL}/api/v1/medico/cases/`,
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }
+      );
+      
+      return await this.handleResponse<SurgicalCase>(response);
+    } catch (error: any) {
       console.error('Error creating case:', error);
       throw error;
     }
   }
 
   /**
-   * Update an existing case
+   * Update a surgical case
    */
-  async updateCase(id: number, data: Partial<SurgicalCaseCreate>): Promise<SurgicalCase> {
+  async updateCase(id: number, data: UpdateCaseData): Promise<SurgicalCase> {
     try {
-      const response = await authService.authenticatedFetch(`${API_BASE_URL}/${id}/`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Error al actualizar caso');
-      }
-
-      return await response.json();
-    } catch (error) {
+      console.log('Updating case with data:', data);
+      
+      const response = await authService.authenticatedFetch(
+        `${API_URL}/api/v1/medico/cases/${id}/`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(data),
+        }
+      );
+      
+      return await this.handleResponse<SurgicalCase>(response);
+    } catch (error: any) {
       console.error('Error updating case:', error);
       throw error;
     }
   }
 
   /**
-   * Delete a case
+   * Delete a surgical case
    */
   async deleteCase(id: number): Promise<void> {
     try {
-      const response = await authService.authenticatedFetch(`${API_BASE_URL}/${id}/`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al eliminar caso');
-      }
-    } catch (error) {
-      console.error('Error deleting case:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get cases statistics
-   */
-  async getStats(): Promise<CaseStats> {
-    try {
-      const response = await authService.authenticatedFetch(`${API_BASE_URL}/stats/`);
-      
-      if (!response.ok) {
-        throw new Error(`Error al obtener estadísticas: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Add a procedure to an existing case
-   */
-  async addProcedure(caseId: number, procedure: Omit<CaseProcedure, 'id' | 'created_at' | 'updated_at'>): Promise<CaseProcedure> {
-    try {
       const response = await authService.authenticatedFetch(
-        `${API_BASE_URL}/${caseId}/add-procedure/`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(procedure),
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Error al agregar procedimiento');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Error adding procedure:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Remove a procedure from a case
-   */
-  async removeProcedure(caseId: number, procedureId: number): Promise<void> {
-    try {
-      const response = await authService.authenticatedFetch(
-        `${API_BASE_URL}/${caseId}/remove-procedure/${procedureId}/`,
+        `${API_URL}/api/v1/medico/cases/${id}/`,
         {
           method: 'DELETE',
         }
       );
 
       if (!response.ok) {
-        throw new Error('Error al eliminar procedimiento');
+        const contentType = response.headers.get('content-type');
+        if (contentType?.includes('application/json')) {
+          const error = await response.json();
+          throw new Error(error.detail || 'Failed to delete case');
+        }
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
-    } catch (error) {
-      console.error('Error removing procedure:', error);
+    } catch (error: any) {
+      console.error('Error deleting case:', error);
       throw error;
     }
   }
 
   /**
-   * Update case status only
+   * Marcar cirugía como operada
    */
-  async updateStatus(caseId: number, status: string): Promise<SurgicalCase> {
-    try {
-      const response = await authService.authenticatedFetch(
-        `${API_BASE_URL}/${caseId}/update-status/`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ status }),
-        }
-      );
+  async toggleOperated(id: number, isOperated: boolean): Promise<SurgicalCase> {
+    return this.updateCase(id, { is_operated: isOperated });
+  }
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Error al actualizar estado');
-      }
+  /**
+   * Marcar cirugía como facturada
+   */
+  async toggleBilled(id: number, isBilled: boolean): Promise<SurgicalCase> {
+    return this.updateCase(id, { is_billed: isBilled });
+  }
 
-      return await response.json();
-    } catch (error) {
-      console.error('Error updating status:', error);
-      throw error;
+  /**
+   * Marcar cirugía como cobrada
+   */
+  async togglePaid(id: number, isPaid: boolean): Promise<SurgicalCase> {
+    return this.updateCase(id, { is_paid: isPaid });
+  }
+
+  /**
+   * Verificar si una cirugía puede ser eliminada
+   */
+  canDelete(surgicalCase: SurgicalCase): { allowed: boolean; reason?: string } {
+    if (!surgicalCase.is_paid) {
+      return {
+        allowed: false,
+        reason: 'No se puede eliminar una cirugía que no ha sido cobrada'
+      };
     }
+    return { allowed: true };
   }
 }
 

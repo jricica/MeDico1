@@ -1,3 +1,5 @@
+#apps/medico/views/surgical_case.py
+
 """
 ViewSets para casos quirúrgicos
 """
@@ -116,26 +118,39 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
             total=Sum('calculated_value')
         )['total'] or Decimal('0.00')
         
-        # Casos por estado
+        # Casos por estado con valor total
         cases_by_status = {}
         for status_choice in SurgicalCase.STATUS_CHOICES:
             status_code = status_choice[0]
-            count = queryset.filter(status=status_code).count()
+            status_cases = queryset.filter(status=status_code)
+            count = status_cases.count()
+            
+            # Calcular valor total para este estado
+            status_value = CaseProcedure.objects.filter(
+                case__in=status_cases
+            ).aggregate(
+                total=Sum('calculated_value')
+            )['total'] or Decimal('0.00')
+            
             cases_by_status[status_code] = {
                 'count': count,
-                'label': status_choice[1]
+                'total_value': float(status_value)
             }
         
-        # Casos por especialidad (top 5)
-        cases_by_specialty = CaseProcedure.objects.filter(
+        # Casos por especialidad (top 5) con valor total
+        specialty_stats = CaseProcedure.objects.filter(
             case__in=queryset
         ).values('specialty').annotate(
-            count=Count('id')
+            count=Count('id'),
+            total_value=Sum('calculated_value')
         ).order_by('-count')[:5]
         
-        specialty_dict = {
-            item['specialty']: item['count'] 
-            for item in cases_by_specialty
+        cases_by_specialty = {
+            item['specialty']: {
+                'count': item['count'],
+                'total_value': float(item['total_value'] or 0)
+            }
+            for item in specialty_stats
         }
         
         # Casos recientes (últimos 5)
@@ -147,7 +162,7 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
             'total_procedures': total_procedures,
             'total_value': float(total_value),
             'cases_by_status': cases_by_status,
-            'cases_by_specialty': specialty_dict,
+            'cases_by_specialty': cases_by_specialty,
             'recent_cases': recent_serializer.data,
         }
         

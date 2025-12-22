@@ -1,4 +1,13 @@
-import { Calculator, History, Home, Settings, Star, Stethoscope, Building2 } from "lucide-react";
+import { 
+  Calculator, 
+  History, 
+  Home, 
+  Settings, 
+  Star, 
+  Stethoscope, 
+  Building2,
+  Briefcase  // ← Nuevo icono para Cases
+} from "lucide-react";
 
 import {
   Sidebar,
@@ -17,6 +26,11 @@ const items = [
     title: "Dashboard",
     url: "/",
     icon: Home,
+  },
+  {
+    title: "Cases",  // ← Nuevo item
+    url: "/cases",
+    icon: Briefcase,
   },
   {
     title: "Operations",
@@ -47,7 +61,15 @@ const items = [
     title: "Settings",
     url: "/settings",
     icon: Settings,
+    
   },
+  
+  { 
+  title: "Logout", 
+  url: "/logout", 
+  icon: Settings,
+  }
+ 
 ];
 
 export function AppSidebar() {
