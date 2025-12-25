@@ -1,3 +1,4 @@
+# apps/medio_auth/serializers/__init__.py
 from rest_framework import serializers
 from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.password_validation import validate_password
@@ -9,19 +10,25 @@ User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     """Serializer para mostrar información del usuario"""
     full_name = serializers.CharField(source='get_full_name', read_only=True)
-    name = serializers.CharField(source='get_full_name', read_only=True)  # Alias para compatibilidad con frontend
+    name = serializers.CharField(source='get_full_name', read_only=True)
     is_profile_complete = serializers.BooleanField(read_only=True)
+    is_admin = serializers.BooleanField(read_only=True)
     
     class Meta:
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'name',
-            'role',  # Campo agregado
+            'role', 'is_admin',
             'phone', 'specialty', 'license_number', 'hospital_default',
-            'avatar', 'signature_image', 'is_verified', 'theme_preference',
+            'avatar', 'signature_image', 
+            'is_verified', 'is_email_verified',  # ← AGREGADO is_email_verified
+            'theme_preference',
             'is_profile_complete', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'is_verified', 'created_at', 'updated_at', 'name', 'full_name']
+        read_only_fields = [
+            'id', 'is_verified', 'is_email_verified',  # ← AGREGADO
+            'created_at', 'updated_at', 'name', 'full_name', 'is_admin'
+        ]
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -81,12 +88,13 @@ class RegisterSerializer(serializers.ModelSerializer):
         return attrs
     
     def create(self, validated_data):
-        """Crear nuevo usuario"""
+        """Crear nuevo usuario con email sin verificar"""
         validated_data.pop('password2')
         password = validated_data.pop('password')
         
         user = User.objects.create_user(
             password=password,
+            is_email_verified=False,  # ← Email no verificado por defecto
             **validated_data
         )
         
@@ -124,11 +132,9 @@ class LoginSerializer(serializers.Serializer):
         
         # Siempre realizar verificación de contraseña para prevenir timing attacks
         if user_obj:
-            # Verificar contraseña manualmente primero (tiempo constante)
             password_valid = check_password(password, user_obj.password)
             
             if password_valid:
-                # Solo autenticar si la contraseña es correcta
                 user = authenticate(
                     request=self.context.get('request'),
                     username=user_obj.username,
@@ -136,7 +142,6 @@ class LoginSerializer(serializers.Serializer):
                 )
         else:
             # Realizar dummy password check para mantener tiempo constante
-            # Usar un hash falso que tenga el mismo tiempo de procesamiento
             check_password(password, 'pbkdf2_sha256$260000$invalid$invalid')
         
         # Usar mensaje genérico para prevenir enumeración de usuarios

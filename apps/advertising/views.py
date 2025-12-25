@@ -1,4 +1,4 @@
-# advertising/views.py
+# apps/advertising/views.py
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes

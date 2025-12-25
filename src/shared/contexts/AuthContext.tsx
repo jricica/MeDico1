@@ -12,6 +12,7 @@ interface AuthContextType {
   loading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  accessToken: string | null;  // ← AGREGADO
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
@@ -156,6 +157,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loading,
     isAuthenticated: !!user,
     isAdmin: user?.role === 0,
+    accessToken: authService.getAccessToken(),  // ← AGREGADO
     login,
     register,
     logout,

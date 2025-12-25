@@ -1,6 +1,7 @@
 // src/pages/index.tsx
 
 import { AppLayout } from "@/shared/components/layout/AppLayout";
+import { EmailVerificationBanner } from "@/shared/components/EmailVerificationBanner";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { useAuth } from "@/shared/contexts/AuthContext";
@@ -109,6 +110,9 @@ const Index = () => {
   return (
     <AppLayout>
       <div className="space-y-6">
+        {/* Email Verification Banner */}
+        <EmailVerificationBanner />
+
         {/* Carrusel de Anuncios Gold */}
         {loadingAds ? (
           <Card className="overflow-hidden border-amber-200">
@@ -134,9 +138,9 @@ const Index = () => {
             </CardHeader>
             <CardContent>
               <div className="relative">
-                {/* Imagen del Anuncio */}
+                {/* Imagen del Anuncio - FIXED: Se adapta al tamaño de la imagen */}
                 <div 
-                  className="relative h-48 md:h-64 bg-gray-100 rounded-lg overflow-hidden cursor-pointer group"
+                  className="relative bg-gray-900 rounded-lg overflow-hidden cursor-pointer group"
                   onClick={() => currentAd && handleAdClick(currentAd)}
                 >
                   {currentAd && (
@@ -144,7 +148,7 @@ const Index = () => {
                       <img
                         src={currentAd.image_url}
                         alt={currentAd.image_alt_text || currentAd.title || 'Advertisement'}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        className="w-full h-auto max-h-[400px] object-contain transition-transform duration-300 group-hover:scale-105"
                       />
                       
                       {/* Overlay en hover */}

@@ -6,12 +6,15 @@ import { ProtectedRoute } from "@/shared/components/auth/ProtectedRoute";
 // Admin components
 import { AdminLayout } from "@/admin/components/AdminLayout";
 import AdminDashboard from "@/admin/pages/Dashboard";
-import Clients from "@/admin/pages/Clients"; // ← Agregar esta línea
+import Clients from "@/admin/pages/Clients";
+import Advertisements from "@/admin/pages/Advertisements";
+import UsersPage from "@/admin/pages/UsersPage";
 
 // Auth pages
 import LoginPage from "@/pages/login";
 import SignupForm from "@/pages/signup";
 import LogoutPage from "@/pages/logout";
+import VerifyEmailPage from "@/pages/verify-email";
 
 // Main pages
 import Index from "@/pages/index";
@@ -26,7 +29,6 @@ import Favorites from "@/pages/favorites";
 import HistoryPage from "@/pages/history";
 import SettingsPage from "@/pages/settings";
 import DebugFavorites from "@/pages/debug-favorites";
-import Advertisements from "@/admin/pages/Advertisements";
 
 export const AppRouter = () => {
   return (
@@ -35,20 +37,22 @@ export const AppRouter = () => {
       <Route path='/login' element={<LoginPage />} />
       <Route path='/signup' element={<SignupForm />} />
       <Route path='/logout' element={<LogoutPage />} />
+      <Route path='/verify-email' element={<VerifyEmailPage />} />
 
       {/* Admin routes */}
-        <Route
-          path='/admin'
-          element={
-            <ProtectedRoute requireAdmin>
-              <AdminLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<AdminDashboard />} />
-          <Route path='clients' element={<Clients />} />
-          <Route path='advertisements' element={<Advertisements />} /> {/* ← Mover AQUÍ */}
-        </Route>
+      <Route
+        path='/admin'
+        element={
+          <ProtectedRoute requireAdmin>
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<AdminDashboard />} />
+        <Route path='users' element={<UsersPage />} />
+        <Route path='clients' element={<Clients />} />
+        <Route path='advertisements' element={<Advertisements />} />
+      </Route>
 
       {/* Protected routes */}
       <Route path='/' element={<ProtectedRoute><Index /></ProtectedRoute>} />
@@ -63,7 +67,6 @@ export const AppRouter = () => {
       <Route path='/history' element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
       <Route path='/settings' element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       <Route path='/debug-favorites' element={<ProtectedRoute><DebugFavorites /></ProtectedRoute>} />
-      
     </Routes>
   );
 };

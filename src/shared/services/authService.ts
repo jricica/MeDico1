@@ -2,7 +2,6 @@
  * Servicio de Autenticación para MeDico
  * Maneja todas las operaciones relacionadas con autenticación JWT
  */
-//authService.ts
 
 import { parseAuthError, NetworkError, TokenRefreshError } from './authErrors';
 
@@ -25,7 +24,7 @@ export interface User {
   last_name: string;
   full_name: string;
   role: number;
-  name: string;  // Alias de full_name para compatibilidad
+  name: string;
   phone?: string;
   specialty?: string;
   license_number?: string;
@@ -33,6 +32,7 @@ export interface User {
   avatar?: string;
   signature_image?: string;
   is_verified: boolean;
+  is_email_verified: boolean;
   theme_preference: 'light' | 'dark' | 'system';
   is_profile_complete: boolean;
   created_at: string;
@@ -66,6 +66,7 @@ export interface AuthResponse {
   message: string;
   user: User;
   tokens: AuthTokens;
+  email_verification_sent?: boolean;
 }
 
 export interface ChangePasswordData {
@@ -254,7 +255,6 @@ class AuthService {
         });
 
         if (!response.ok) {
-          // Token inválido - será manejado en el catch
           throw new TokenRefreshError('Refresh token expired or invalid');
         }
 
@@ -263,16 +263,12 @@ class AuthService {
 
         return result.access;
       } catch (error) {
-        // Solo limpiar auth si es un error de autenticación, NO en errores de red
         if (error instanceof TypeError) {
-          // Error de red - no limpiar tokens, permitir retry
           throw new NetworkError();
         }
-        // Error de autenticación (TokenRefreshError u otros) - limpiar tokens
         this.clearAuth();
         throw error;
       } finally {
-        // Limpiar la promesa después de completar
         this.refreshPromise = null;
       }
     })();
@@ -331,6 +327,7 @@ class AuthService {
 
   /**
    * Realizar fetch con autenticación automática (incluye retry con refresh token)
+   * 🔧 FIXED: Detecta FormData y no agrega Content-Type para permitir subida de archivos
    */
   async authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
     const accessToken = this.getAccessToken();
@@ -339,14 +336,22 @@ class AuthService {
       throw new Error('No access token available');
     }
 
+    // 🔧 CRITICAL FIX: Preparar headers correctamente según el tipo de body
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${accessToken}`,
+      ...(options.headers as Record<string, string>),
+    };
+
+    // ⚠️ NO agregar Content-Type si el body es FormData
+    // El navegador lo hace automáticamente con el boundary correcto
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
+
     // Intentar request con access token actual
     let response = await fetch(url, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
-        ...options.headers,
-      },
+      headers,
     });
 
     // Si es 401, intentar refresh y reintentar
@@ -354,17 +359,23 @@ class AuthService {
       try {
         const newAccessToken = await this.refreshAccessToken();
         
+        // Preparar headers nuevamente para el retry
+        const retryHeaders: Record<string, string> = {
+          'Authorization': `Bearer ${newAccessToken}`,
+          ...(options.headers as Record<string, string>),
+        };
+
+        // ⚠️ NO agregar Content-Type si el body es FormData
+        if (!(options.body instanceof FormData)) {
+          retryHeaders['Content-Type'] = 'application/json';
+        }
+        
         // Reintentar request con nuevo token
         response = await fetch(url, {
           ...options,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${newAccessToken}`,
-            ...options.headers,
-          },
+          headers: retryHeaders,
         });
       } catch (error) {
-        // Si falla el refresh, redirigir a login
         this.clearAuth();
         window.location.href = '/login';
         throw error;

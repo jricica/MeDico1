@@ -263,9 +263,9 @@ const Advertisements = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {/* Preview Image */}
+                  {/* Preview Image - FIXED: object-contain para ver imagen completa */}
                   {ad.image_url && (
-                    <div className="relative w-full h-32 bg-gray-100 rounded-lg overflow-hidden">
+                    <div className="relative w-full bg-gray-50 rounded-lg overflow-hidden flex items-center justify-center" style={{ minHeight: '150px' }}>
                       {imageLoadingStates[ad.id] === 'loading' && (
                         <div className="absolute inset-0 flex items-center justify-center">
                           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -282,7 +282,7 @@ const Advertisements = () => {
                       <img 
                         src={ad.image_url} 
                         alt={ad.image_alt_text || ad.campaign_name}
-                        className={`w-full h-full object-cover transition-opacity ${
+                        className={`max-w-full max-h-[200px] object-contain transition-opacity ${
                           imageLoadingStates[ad.id] === 'loaded' ? 'opacity-100' : 'opacity-0'
                         }`}
                         onLoad={() => handleImageLoad(ad.id)}

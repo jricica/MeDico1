@@ -1,5 +1,8 @@
+# apps/medio_auth/models/__init__.py
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
+import secrets
 
 
 class CustomUser(AbstractUser):
@@ -72,10 +75,25 @@ class CustomUser(AbstractUser):
         help_text="Imagen de la firma del doctor para documentos"
     )
     
-    # Verificación y seguridad
-    is_verified = models.BooleanField(
+    # Plan de Suscripción
+    PLAN_CHOICES = [
+        ('bronze', 'Bronze'),
+        ('silver', 'Silver'),
+        ('gold', 'Gold'),
+    ]
+    
+    plan = models.CharField(
+        max_length=10,
+        choices=PLAN_CHOICES,
+        default='bronze',
+        verbose_name="Plan de Suscripción",
+        help_text="Plan actual del usuario"
+    )
+    
+    # Verificación de Email - CAMPOS NUEVOS
+    is_email_verified = models.BooleanField(
         default=False,
-        verbose_name="Cuenta Verificada",
+        verbose_name="Email Verificado",
         help_text="Indica si el email del usuario ha sido verificado"
     )
     
@@ -83,8 +101,22 @@ class CustomUser(AbstractUser):
         max_length=100,
         blank=True,
         null=True,
-        verbose_name="Token de Verificación",
-        help_text="Token para verificación de email"
+        verbose_name="Token de Verificación de Email",
+        help_text="Token único para verificar el email del usuario"
+    )
+    
+    email_verification_sent_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="Fecha de Envío del Token",
+        help_text="Fecha y hora en que se envió el último token de verificación"
+    )
+    
+    # Verificación general (mantener para compatibilidad)
+    is_verified = models.BooleanField(
+        default=False,
+        verbose_name="Cuenta Verificada por Admin",
+        help_text="Indica si la cuenta ha sido verificada por un administrador"
     )
     
     # Configuraciones personales
@@ -110,7 +142,7 @@ class CustomUser(AbstractUser):
         verbose_name="Última Actualización"
     )
     
-    # Modificar email para que sea obligatorio
+    # Email obligatorio y único
     email = models.EmailField(
         unique=True,
         verbose_name="Email",
@@ -125,6 +157,7 @@ class CustomUser(AbstractUser):
             models.Index(fields=['email']),
             models.Index(fields=['license_number']),
             models.Index(fields=['created_at']),
+            models.Index(fields=['email_verification_token']),
         ]
     
     def __str__(self):
@@ -134,6 +167,22 @@ class CustomUser(AbstractUser):
         """Devuelve el nombre completo del usuario"""
         full_name = f"{self.first_name} {self.last_name}".strip()
         return full_name if full_name else self.username
+    
+    def generate_verification_token(self):
+        """
+        Genera un token único para verificación de email.
+        Retorna el token generado.
+        """
+        self.email_verification_token = secrets.token_urlsafe(32)
+        self.email_verification_sent_at = timezone.now()
+        self.save()
+        return self.email_verification_token
+    
+    def clear_verification_token(self):
+        """Limpia el token de verificación después de usarlo"""
+        self.email_verification_token = None
+        self.email_verification_sent_at = None
+        self.save()
     
     @property
     def is_profile_complete(self):
@@ -150,9 +199,18 @@ class CustomUser(AbstractUser):
     @property
     def is_admin(self):
         """Verifica si el usuario es administrador"""
-        return self.role == 0
+        return self.role == 0 or self.is_staff or self.is_superuser
     
     @property
     def role_name(self):
         """Devuelve el nombre del rol"""
         return dict(self.ROLE_CHOICES).get(self.role, 'Unknown')
+    
+    @property
+    def verification_status(self):
+        """Retorna el estado completo de verificación del usuario"""
+        return {
+            'email_verified': self.is_email_verified,
+            'account_verified': self.is_verified,
+            'profile_complete': self.is_profile_complete
+        }

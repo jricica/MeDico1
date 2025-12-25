@@ -122,13 +122,6 @@ def admin_stats(request):
         created_at__gte=first_day_of_month
     ).count()
     
-    # Estadísticas adicionales opcionales (comentadas por si las quieres usar)
-    # total_procedures = CaseProcedure.objects.count()
-    # total_hospitals = Hospital.objects.count()
-    # total_value = SurgicalCase.objects.aggregate(
-    #     total=Sum('procedures__calculated_value')
-    # )['total'] or Decimal('0.00')
-    
     return Response({
         'totalUsers': total_users,
         'totalCases': total_cases,
@@ -212,6 +205,7 @@ def admin_users(request):
         'is_staff', 
         'is_active', 
         'is_superuser',
+        'is_verified',  # ← AGREGADO
         'date_joined', 
         'last_login'
     )
@@ -232,17 +226,14 @@ def admin_users(request):
         user['full_name'] = full_name if full_name else user['username']
         
         # Contar casos quirúrgicos creados por este usuario
-        user['cases_count'] = SurgicalCase.objects.filter(
+        user['total_cases'] = SurgicalCase.objects.filter(
             created_by_id=user['id']
         ).count()
         
-        # Opcional: Agregar valor total de casos del usuario
-        # total_value = SurgicalCase.objects.filter(
-        #     created_by_id=user['id']
-        # ).aggregate(
-        #     total=Sum('procedures__calculated_value')
-        # )['total']
-        # user['total_cases_value'] = float(total_value) if total_value else 0.0
+        # Obtener el plan real del usuario desde la base de datos
+        user_obj = User.objects.get(id=user['id'])
+        user['plan'] = getattr(user_obj, 'plan')  
+        user['total_favorites'] = 0  
     
     return Response(users_list)
 
@@ -297,3 +288,54 @@ def admin_procedures(request):
     ).order_by('-usage_count')[:10]
     
     return Response(list(top_procedures))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def delete_user(request, user_id):
+    """
+    Elimina un usuario del sistema.
+    Solo superusuarios pueden eliminar usuarios.
+    Los superusuarios no pueden ser eliminados.
+    """
+    try:
+        # Verificar que el usuario que hace la petición sea superusuario
+        if not request.user.is_superuser:
+            return Response({
+                'success': False,
+                'message': 'Solo los superusuarios pueden eliminar usuarios'
+            }, status=403)
+        
+        # Buscar el usuario a eliminar
+        user_to_delete = User.objects.get(id=user_id)
+        
+        # Prevenir eliminación de superusuarios
+        if user_to_delete.is_superuser:
+            return Response({
+                'success': False,
+                'message': 'No se puede eliminar un superusuario'
+            }, status=400)
+        
+        # Guardar información antes de eliminar
+        user_name = user_to_delete.get_full_name() or user_to_delete.username
+        cases_count = SurgicalCase.objects.filter(created_by=user_to_delete).count()
+        
+        # Eliminar el usuario (Django eliminará automáticamente sus casos en cascada si está configurado)
+        user_to_delete.delete()
+        
+        return Response({
+            'success': True,
+            'message': f'Usuario {user_name} eliminado exitosamente',
+            'deleted_cases': cases_count
+        })
+        
+    except User.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Usuario no encontrado'
+        }, status=404)
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error al eliminar usuario: {str(e)}'
+        }, status=500)

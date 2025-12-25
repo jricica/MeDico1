@@ -1,6 +1,8 @@
+# core/settings/base.py
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from datetime import timedelta
 
 load_dotenv()
 
@@ -10,7 +12,11 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-change-this-in
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '172.22.240.1',
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -30,6 +36,7 @@ INSTALLED_APPS = [
     'apps.invoice.apps.InvoiceConfig',
     'apps.payment.apps.PaymentConfig',
     'apps.advertising.apps.AdvertisingConfig',
+    'django_extensions',
 ]
 
 MIDDLEWARE = [
@@ -38,7 +45,7 @@ MIDDLEWARE = [
     'core.middleware.ViteDevMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'core.middleware.DisableCSRFForAPIMiddleware',  # Deshabilitar CSRF para /api/* ANTES de CsrfViewMiddleware
+    'core.middleware.DisableCSRFForAPIMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -76,7 +83,6 @@ DATABASES = {
     }
 }
 
-
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -105,7 +111,6 @@ AUTH_USER_MODEL = 'medio_auth.CustomUser'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        # SessionAuthentication removida para evitar problemas con CSRF en API
     ],
     'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.IsAuthenticated'],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
@@ -118,8 +123,6 @@ REST_FRAMEWORK = {
 }
 
 # Configuración de Simple JWT
-from datetime import timedelta
-
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -144,15 +147,52 @@ SIMPLE_JWT = {
     'JTI_CLAIM': 'jti',
 }
 
+# ============================================
+# CONFIGURACIÓN DE EMAIL
+# ============================================
+
+# Para desarrollo: Console backend (muestra emails en la terminal)
+if DEBUG:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+else:
+    # Para producción: SMTP backend
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
+# Configuración SMTP (para producción)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'MéDico1 <noreply@medico1.com>')
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+# Timeout para envío de emails
+EMAIL_TIMEOUT = 10
+
+# URL del frontend para enlaces de verificación
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+
+# ============================================
+# FIN CONFIGURACIÓN DE EMAIL
+# ============================================
+
 CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://172.22.240.1:5173",
+]
 CORS_ALLOW_CREDENTIALS = True
 
-# Excluir las rutas de API del CSRF (usamos JWT en su lugar)
-CSRF_TRUSTED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
-CSRF_COOKIE_SECURE = False  # Para desarrollo local
-CSRF_COOKIE_HTTPONLY = False  # Permitir acceso desde JavaScript
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://172.22.240.1:5173",
+]
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_HTTPONLY = False
 
 # Tamaño máximo de archivo subido (20MB)
-DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024  # 20MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024  # 20MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024
