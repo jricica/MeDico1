@@ -18,15 +18,15 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name', 'full_name', 'name',
-            'role', 'is_admin',
+            'role', 'is_admin', 'plan', 'friend_code',
             'phone', 'specialty', 'license_number', 'hospital_default',
             'avatar', 'signature_image', 
-            'is_verified', 'is_email_verified',  # ← AGREGADO is_email_verified
+            'is_verified', 'is_email_verified',
             'theme_preference',
             'is_profile_complete', 'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'id', 'is_verified', 'is_email_verified',  # ← AGREGADO
+            'id', 'is_verified', 'is_email_verified', 'friend_code',
             'created_at', 'updated_at', 'name', 'full_name', 'is_admin'
         ]
 
@@ -94,7 +94,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         
         user = User.objects.create_user(
             password=password,
-            is_email_verified=False,  # ← Email no verificado por defecto
+            is_email_verified=False,
             **validated_data
         )
         
@@ -141,10 +141,8 @@ class LoginSerializer(serializers.Serializer):
                     password=password
                 )
         else:
-            # Realizar dummy password check para mantener tiempo constante
             check_password(password, 'pbkdf2_sha256$260000$invalid$invalid')
         
-        # Usar mensaje genérico para prevenir enumeración de usuarios
         if not user:
             raise ValidationError({
                 'non_field_errors': 'Credenciales inválidas. Por favor verifique su email y contraseña.'
@@ -219,3 +217,43 @@ class UserUpdateSerializer(serializers.ModelSerializer):
                     "Este número de colegiado ya está registrado."
                 )
         return value
+
+
+# ============================================
+# SERIALIZERS DE AMISTAD/COLEGAS
+# ============================================
+
+class ColleagueSerializer(serializers.ModelSerializer):
+    """Serializer simplificado para mostrar información de colegas"""
+    full_name = serializers.CharField(source='get_full_name', read_only=True)
+    
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'email', 'first_name', 'last_name', 'full_name',
+            'specialty', 'hospital_default', 'avatar', 'friend_code', 'phone'
+        ]
+        read_only_fields = fields
+
+
+class FriendshipSerializer(serializers.ModelSerializer):
+    """Serializer para relaciones de amistad"""
+    colleague = ColleagueSerializer(source='friend', read_only=True)
+    
+    class Meta:
+        from apps.medio_auth.models import Friendship
+        model = Friendship
+        fields = ['id', 'colleague', 'created_at']
+        read_only_fields = fields
+
+
+class FriendRequestSerializer(serializers.ModelSerializer):
+    """Serializer para solicitudes de amistad"""
+    from_user = ColleagueSerializer(read_only=True)
+    to_user = ColleagueSerializer(read_only=True)
+    
+    class Meta:
+        from apps.medio_auth.models import FriendRequest
+        model = FriendRequest
+        fields = ['id', 'from_user', 'to_user', 'status', 'created_at', 'updated_at']
+        read_only_fields = fields

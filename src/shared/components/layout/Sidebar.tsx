@@ -6,7 +6,9 @@ import {
   Star, 
   Stethoscope, 
   Building2,
-  Briefcase  // ← Nuevo icono para Cases
+  Briefcase,
+  Users,  // ← Nuevo icono para Colleagues
+  LogOut
 } from "lucide-react";
 
 import {
@@ -28,7 +30,7 @@ const items = [
     icon: Home,
   },
   {
-    title: "Cases",  // ← Nuevo item
+    title: "Cases",
     url: "/cases",
     icon: Briefcase,
   },
@@ -41,6 +43,11 @@ const items = [
     title: "Hospitals",
     url: "/hospitals",
     icon: Building2,
+  },
+  {
+    title: "Colleagues",  // ← Nuevo item
+    url: "/colleagues",
+    icon: Users,
   },
   {
     title: "Calculator",
@@ -61,15 +68,12 @@ const items = [
     title: "Settings",
     url: "/settings",
     icon: Settings,
-    
   },
-  
   { 
-  title: "Logout", 
-  url: "/logout", 
-  icon: Settings,
+    title: "Logout", 
+    url: "/logout", 
+    icon: LogOut,
   }
- 
 ];
 
 export function AppSidebar() {

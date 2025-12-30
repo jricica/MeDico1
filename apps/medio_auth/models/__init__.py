@@ -3,6 +3,8 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
 import secrets
+import string
+import random
 
 
 class CustomUser(AbstractUser):
@@ -149,6 +151,16 @@ class CustomUser(AbstractUser):
         help_text="Dirección de correo electrónico"
     )
     
+    # Código de amistad único para compartir
+    friend_code = models.CharField(
+        max_length=8,
+        unique=True,
+        blank=True,
+        null=True,
+        verbose_name="Código de Colega",
+        help_text="Código único para compartir con otros médicos"
+    )
+    
     class Meta:
         verbose_name = 'Usuario'
         verbose_name_plural = 'Usuarios'
@@ -158,6 +170,7 @@ class CustomUser(AbstractUser):
             models.Index(fields=['license_number']),
             models.Index(fields=['created_at']),
             models.Index(fields=['email_verification_token']),
+            models.Index(fields=['friend_code']),
         ]
     
     def __str__(self):
@@ -177,6 +190,45 @@ class CustomUser(AbstractUser):
         self.email_verification_sent_at = timezone.now()
         self.save()
         return self.email_verification_token
+    
+    def save(self, *args, **kwargs):
+        # Generar friend_code si no existe
+        if not self.friend_code:
+            self.friend_code = self._generate_unique_friend_code()
+        super().save(*args, **kwargs)
+    
+    @staticmethod
+    def _generate_unique_friend_code():
+        """Genera un código único de 8 caracteres"""
+        while True:
+            # Formato: 4 letras + 2 números + 2 letras (ej: ABCD12XY)
+            code = (
+                ''.join(random.choices(string.ascii_uppercase, k=4)) +
+                ''.join(random.choices(string.digits, k=2)) +
+                ''.join(random.choices(string.ascii_uppercase, k=2))
+            )
+            
+            # Verificar que no exista
+            if not CustomUser.objects.filter(friend_code=code).exists():
+                return code
+    
+    def generate_friend_code(self):
+        """
+        Genera un código único de 8 caracteres para compartir con colegas.
+        Formato: ABC12XYZ (4 letras + 2 números + 2 letras mayúsculas)
+        """
+        while True:
+            # Generar código: 4 letras + 2 números + 2 letras
+            letters1 = ''.join(random.choices(string.ascii_uppercase, k=4))
+            numbers = ''.join(random.choices(string.digits, k=2))
+            letters2 = ''.join(random.choices(string.ascii_uppercase, k=2))
+            code = f"{letters1}{numbers}{letters2}"
+            
+            # Verificar que no exista
+            if not CustomUser.objects.filter(friend_code=code).exists():
+                self.friend_code = code
+                self.save()
+                return code
     
     def clear_verification_token(self):
         """Limpia el token de verificación después de usarlo"""
@@ -214,3 +266,119 @@ class CustomUser(AbstractUser):
             'account_verified': self.is_verified,
             'profile_complete': self.is_profile_complete
         }
+
+
+# ============================================
+# MODELOS DE AMISTAD/COLEGAS
+# ============================================
+
+class Friendship(models.Model):
+    """
+    Modelo para relaciones de amistad entre usuarios (colegas).
+    Relación bidireccional: si A es amigo de B, entonces B es amigo de A.
+    """
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='friendships',
+        verbose_name="Usuario"
+    )
+    
+    friend = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='friends_of',
+        verbose_name="Colega"
+    )
+    
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha de Amistad"
+    )
+    
+    class Meta:
+        verbose_name = 'Amistad'
+        verbose_name_plural = 'Amistades'
+        unique_together = ('user', 'friend')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'friend']),
+            models.Index(fields=['created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.friend.get_full_name()}"
+    
+    def save(self, *args, **kwargs):
+        # Validar que no se agregue a sí mismo
+        if self.user == self.friend:
+            raise ValueError("No puedes agregarte a ti mismo como colega")
+        
+        # Asegurar orden consistente para evitar duplicados (user_id menor primero)
+        if self.user.id > self.friend.id:
+            self.user, self.friend = self.friend, self.user
+        
+        super().save(*args, **kwargs)
+
+
+class FriendRequest(models.Model):
+    """
+    Modelo para solicitudes de amistad entre usuarios.
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pendiente'),
+        ('accepted', 'Aceptada'),
+        ('rejected', 'Rechazada'),
+    ]
+    
+    from_user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='sent_friend_requests',
+        verbose_name="De Usuario"
+    )
+    
+    to_user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='received_friend_requests',
+        verbose_name="Para Usuario"
+    )
+    
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        default='pending',
+        verbose_name="Estado"
+    )
+    
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha de Solicitud"
+    )
+    
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Última Actualización"
+    )
+    
+    class Meta:
+        verbose_name = 'Solicitud de Amistad'
+        verbose_name_plural = 'Solicitudes de Amistad'
+        unique_together = ('from_user', 'to_user')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['from_user', 'to_user']),
+            models.Index(fields=['status']),
+            models.Index(fields=['created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.from_user.get_full_name()} -> {self.to_user.get_full_name()} ({self.status})"
+    
+    def save(self, *args, **kwargs):
+        # Validar que no se envíe solicitud a sí mismo
+        if self.from_user == self.to_user:
+            raise ValueError("No puedes enviarte una solicitud a ti mismo")
+        
+        super().save(*args, **kwargs)

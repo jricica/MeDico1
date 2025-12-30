@@ -24,6 +24,9 @@ export interface User {
   last_name: string;
   full_name: string;
   role: number;
+  is_admin: boolean;
+  plan: string;
+  friend_code: string; // ← AGREGADO
   name: string;
   phone?: string;
   specialty?: string;

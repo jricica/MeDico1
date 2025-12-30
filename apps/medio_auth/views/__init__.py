@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
+from django.db.models import Q
 from datetime import timedelta
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
@@ -17,8 +18,12 @@ from ..serializers import (
     RegisterSerializer,
     LoginSerializer,
     ChangePasswordSerializer,
-    UserUpdateSerializer
+    UserUpdateSerializer,
+    ColleagueSerializer,
+    FriendshipSerializer,
+    FriendRequestSerializer,
 )
+from ..models import Friendship, FriendRequest
 
 User = get_user_model()
 
@@ -229,7 +234,7 @@ class ChangePasswordView(APIView):
 
 
 # ============================================
-# NUEVAS VISTAS DE VERIFICACIÓN DE EMAIL
+# VISTAS DE VERIFICACIÓN DE EMAIL
 # ============================================
 
 class SendVerificationEmailView(APIView):
@@ -421,4 +426,290 @@ class CheckVerificationStatusView(APIView):
             'email': user.email,
             'username': user.username,
             'can_resend': can_resend
+        }, status=status.HTTP_200_OK)
+
+
+# ============================================
+# NUEVAS VISTAS DE AMISTAD/COLEGAS
+# ============================================
+
+class SearchColleagueView(APIView):
+    """
+    Buscar un colega por su friend_code
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        friend_code = request.data.get('friend_code', '').strip().upper()
+        
+        if not friend_code:
+            return Response(
+                {'error': 'El código de colega es requerido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # No permitir buscar el propio código
+        if friend_code == request.user.friend_code:
+            return Response(
+                {'error': 'No puedes agregarte a ti mismo como colega'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            colleague = User.objects.get(friend_code=friend_code)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'No se encontró ningún usuario con ese código'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Verificar si ya son amigos
+        are_friends = Friendship.objects.filter(
+            Q(user=request.user, friend=colleague) |
+            Q(user=colleague, friend=request.user)
+        ).exists()
+        
+        # Verificar si ya existe una solicitud pendiente
+        pending_request = FriendRequest.objects.filter(
+            Q(from_user=request.user, to_user=colleague, status='pending') |
+            Q(from_user=colleague, to_user=request.user, status='pending')
+        ).exists()
+        
+        colleague_data = ColleagueSerializer(colleague).data
+        colleague_data['are_friends'] = are_friends
+        colleague_data['pending_request'] = pending_request
+        
+        return Response(colleague_data, status=status.HTTP_200_OK)
+
+
+class SendFriendRequestView(APIView):
+    """
+    Enviar una solicitud de amistad a otro usuario por su friend_code
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        friend_code = request.data.get('friend_code', '').strip().upper()
+        
+        if not friend_code:
+            return Response(
+                {'error': 'El código de colega es requerido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # No permitir enviar solicitud a uno mismo
+        if friend_code == request.user.friend_code:
+            return Response(
+                {'error': 'No puedes enviarte una solicitud a ti mismo'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            to_user = User.objects.get(friend_code=friend_code)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'No se encontró ningún usuario con ese código'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Verificar si ya son amigos
+        are_friends = Friendship.objects.filter(
+            Q(user=request.user, friend=to_user) |
+            Q(user=to_user, friend=request.user)
+        ).exists()
+        
+        if are_friends:
+            return Response(
+                {'error': 'Ya son colegas'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verificar si ya existe una solicitud pendiente
+        existing_request = FriendRequest.objects.filter(
+            Q(from_user=request.user, to_user=to_user) |
+            Q(from_user=to_user, to_user=request.user)
+        ).filter(status='pending').first()
+        
+        if existing_request:
+            return Response(
+                {'error': 'Ya existe una solicitud pendiente'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Crear la solicitud
+        friend_request = FriendRequest.objects.create(
+            from_user=request.user,
+            to_user=to_user,
+            status='pending'
+        )
+        
+        serializer = FriendRequestSerializer(friend_request)
+        
+        return Response({
+            'message': 'Solicitud enviada correctamente',
+            'friend_request': serializer.data
+        }, status=status.HTTP_201_CREATED)
+
+
+class ListColleaguesView(APIView):
+    """
+    Listar todos los colegas (amigos) del usuario autenticado
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        
+        # Obtener todas las amistades donde el usuario participa
+        friendships = Friendship.objects.filter(
+            Q(user=user) | Q(friend=user)
+        )
+        
+        # Extraer los colegas
+        colleagues = []
+        for friendship in friendships:
+            if friendship.user == user:
+                colleagues.append(friendship.friend)
+            else:
+                colleagues.append(friendship.user)
+        
+        serializer = ColleagueSerializer(colleagues, many=True)
+        
+        return Response({
+            'count': len(colleagues),
+            'colleagues': serializer.data
+        }, status=status.HTTP_200_OK)
+
+
+class ListFriendRequestsView(APIView):
+    """
+    Listar todas las solicitudes de amistad del usuario (enviadas y recibidas)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        
+        # Solicitudes recibidas (pendientes)
+        received_requests = FriendRequest.objects.filter(
+            to_user=user,
+            status='pending'
+        )
+        
+        # Solicitudes enviadas (pendientes)
+        sent_requests = FriendRequest.objects.filter(
+            from_user=user,
+            status='pending'
+        )
+        
+        received_serializer = FriendRequestSerializer(received_requests, many=True)
+        sent_serializer = FriendRequestSerializer(sent_requests, many=True)
+        
+        return Response({
+            'received': {
+                'count': received_requests.count(),
+                'requests': received_serializer.data
+            },
+            'sent': {
+                'count': sent_requests.count(),
+                'requests': sent_serializer.data
+            }
+        }, status=status.HTTP_200_OK)
+
+
+class AcceptFriendRequestView(APIView):
+    """
+    Aceptar una solicitud de amistad
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, request_id):
+        try:
+            friend_request = FriendRequest.objects.get(
+                id=request_id,
+                to_user=request.user,
+                status='pending'
+            )
+        except FriendRequest.DoesNotExist:
+            return Response(
+                {'error': 'Solicitud no encontrada o ya procesada'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Marcar solicitud como aceptada
+        friend_request.status = 'accepted'
+        friend_request.save()
+        
+        # Crear la amistad bidireccional
+        Friendship.objects.create(
+            user=friend_request.from_user,
+            friend=friend_request.to_user
+        )
+        
+        return Response({
+            'message': 'Solicitud aceptada correctamente',
+            'colleague': ColleagueSerializer(friend_request.from_user).data
+        }, status=status.HTTP_200_OK)
+
+
+class RejectFriendRequestView(APIView):
+    """
+    Rechazar una solicitud de amistad
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, request_id):
+        try:
+            friend_request = FriendRequest.objects.get(
+                id=request_id,
+                to_user=request.user,
+                status='pending'
+            )
+        except FriendRequest.DoesNotExist:
+            return Response(
+                {'error': 'Solicitud no encontrada o ya procesada'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Marcar solicitud como rechazada
+        friend_request.status = 'rejected'
+        friend_request.save()
+        
+        return Response({
+            'message': 'Solicitud rechazada correctamente'
+        }, status=status.HTTP_200_OK)
+
+
+class RemoveColleagueView(APIView):
+    """
+    Eliminar un colega (terminar la amistad)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, colleague_id):
+        try:
+            colleague = User.objects.get(id=colleague_id)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Usuario no encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Buscar la amistad (puede estar en cualquier dirección)
+        friendship = Friendship.objects.filter(
+            Q(user=request.user, friend=colleague) |
+            Q(user=colleague, friend=request.user)
+        ).first()
+        
+        if not friendship:
+            return Response(
+                {'error': 'No existe una relación de colegas con este usuario'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Eliminar la amistad
+        friendship.delete()
+        
+        return Response({
+            'message': 'Colega eliminado correctamente'
         }, status=status.HTTP_200_OK)
