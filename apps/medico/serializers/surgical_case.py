@@ -1,8 +1,13 @@
+# apps/medico/serializers/surgical_case.py
+
 """
 Serializers para casos quirúrgicos y procedimientos
 """
 from rest_framework import serializers
-from apps.medico.models import SurgicalCase, CaseProcedure, Hospital
+from apps.medico.models import SurgicalCase, CaseProcedure
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class CaseProcedureSerializer(serializers.ModelSerializer):
@@ -43,16 +48,8 @@ class SurgicalCaseListSerializer(serializers.ModelSerializer):
     """Serializer para listado de casos (vista resumida)"""
     
     hospital_name = serializers.CharField(source='hospital.name', read_only=True)
-    total_rvu = serializers.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        read_only=True
-    )
-    total_value = serializers.DecimalField(
-        max_digits=12, 
-        decimal_places=2, 
-        read_only=True
-    )
+    total_rvu = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    total_value = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     procedure_count = serializers.IntegerField(read_only=True)
     primary_specialty = serializers.CharField(read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
@@ -62,8 +59,13 @@ class SurgicalCaseListSerializer(serializers.ModelSerializer):
     is_billed = serializers.BooleanField(default=False)
     is_paid = serializers.BooleanField(default=False)
     
-    # NUEVOS: Campos de médico ayudante
+    # Campos de médico ayudante
     assistant_display_name = serializers.CharField(read_only=True)
+    assistant_accepted = serializers.BooleanField(read_only=True)
+    
+    # Permisos
+    can_edit = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
     
     class Meta:
         model = SurgicalCase
@@ -81,14 +83,31 @@ class SurgicalCaseListSerializer(serializers.ModelSerializer):
             'assistant_doctor',
             'assistant_doctor_name',
             'assistant_display_name',
+            'assistant_accepted',
             'total_rvu',
             'total_value',
             'procedure_count',
             'primary_specialty',
+            'can_edit',
+            'is_owner',
             'created_at',
             'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_can_edit(self, obj):
+        """Verificar si el usuario actual puede editar"""
+        request = self.context.get('request')
+        if not request or not request.user:
+            return False
+        return obj.can_be_edited_by(request.user)
+    
+    def get_is_owner(self, obj):
+        """Verificar si el usuario actual es el dueño"""
+        request = self.context.get('request')
+        if not request or not request.user:
+            return False
+        return obj.created_by == request.user
 
 
 class SurgicalCaseDetailSerializer(serializers.ModelSerializer):
@@ -102,16 +121,8 @@ class SurgicalCaseDetailSerializer(serializers.ModelSerializer):
         decimal_places=2,
         read_only=True
     )
-    total_rvu = serializers.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        read_only=True
-    )
-    total_value = serializers.DecimalField(
-        max_digits=12, 
-        decimal_places=2, 
-        read_only=True
-    )
+    total_rvu = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    total_value = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     procedure_count = serializers.IntegerField(read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
@@ -121,8 +132,14 @@ class SurgicalCaseDetailSerializer(serializers.ModelSerializer):
     is_billed = serializers.BooleanField(default=False)
     is_paid = serializers.BooleanField(default=False)
     
-    # NUEVOS: Campos de médico ayudante
+    # Campos de médico ayudante
     assistant_display_name = serializers.CharField(read_only=True)
+    assistant_accepted = serializers.BooleanField(read_only=True)
+    assistant_notified_at = serializers.DateTimeField(read_only=True)
+    
+    # Permisos
+    can_edit = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
     
     class Meta:
         model = SurgicalCase
@@ -145,6 +162,8 @@ class SurgicalCaseDetailSerializer(serializers.ModelSerializer):
             'assistant_doctor',
             'assistant_doctor_name',
             'assistant_display_name',
+            'assistant_accepted',
+            'assistant_notified_at',
             'notes',
             'diagnosis',
             'procedures',
@@ -153,10 +172,26 @@ class SurgicalCaseDetailSerializer(serializers.ModelSerializer):
             'procedure_count',
             'created_by',
             'created_by_name',
+            'can_edit',
+            'is_owner',
             'created_at',
             'updated_at',
         ]
         read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
+    
+    def get_can_edit(self, obj):
+        """Verificar si el usuario actual puede editar"""
+        request = self.context.get('request')
+        if not request or not request.user:
+            return False
+        return obj.can_be_edited_by(request.user)
+    
+    def get_is_owner(self, obj):
+        """Verificar si el usuario actual es el dueño"""
+        request = self.context.get('request')
+        if not request or not request.user:
+            return False
+        return obj.created_by == request.user
 
 
 class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
@@ -169,9 +204,9 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
     is_billed = serializers.BooleanField(default=False, required=False)
     is_paid = serializers.BooleanField(default=False, required=False)
     
-    # NUEVOS: Campos de médico ayudante (opcionales)
+    # Campos de médico ayudante (opcionales)
     assistant_doctor = serializers.PrimaryKeyRelatedField(
-        queryset=Hospital.objects.none(),  # Se configurará en __init__
+        queryset=User.objects.all(),
         required=False,
         allow_null=True
     )
@@ -207,15 +242,6 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Configurar queryset para assistant_doctor
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        if 'request' in self.context:
-            # Permitir seleccionar cualquier usuario como ayudante
-            self.fields['assistant_doctor'].queryset = User.objects.all()
-    
     def validate_patient_name(self, value):
         """Validar que el nombre no esté vacío"""
         if not value or not value.strip():
@@ -224,7 +250,7 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
     
     def validate(self, data):
         """Validaciones de lógica de negocio"""
-        # NUEVO: Validar que no se usen ambos campos de ayudante a la vez
+        # Validar que no se usen ambos campos de ayudante a la vez
         assistant_doctor = data.get('assistant_doctor')
         assistant_doctor_name = data.get('assistant_doctor_name')
         
@@ -261,7 +287,6 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
         
         # Crear los procedimientos
         for index, proc_data in enumerate(procedures_data):
-            # Si proc_data no tiene 'order', usar el índice
             if 'order' not in proc_data:
                 proc_data['order'] = index
             CaseProcedure.objects.create(

@@ -50,11 +50,13 @@ export interface SurgicalCase {
   patient_gender?: PatientGender;
   hospital: number;
   hospital_name?: string;
+  hospital_rate_multiplier?: number;
   surgery_date: string;
   surgery_time?: string;
   diagnosis?: string;
   notes?: string;
   status: CaseStatus;
+  status_display?: string;
   
   // Campos de estado
   is_operated?: boolean;
@@ -65,6 +67,12 @@ export interface SurgicalCase {
   assistant_doctor?: number | null;
   assistant_doctor_name?: string | null;
   assistant_display_name?: string;
+  assistant_accepted?: boolean;
+  assistant_notified_at?: string | null;
+  
+  // Permisos
+  can_edit?: boolean;
+  is_owner?: boolean;
   
   procedure_count?: number;
   total_rvu?: number;
@@ -74,6 +82,7 @@ export interface SurgicalCase {
   created_at: string;
   updated_at: string;
   created_by?: number;
+  created_by_name?: string;
 }
 
 export interface CreateCaseData {
@@ -88,6 +97,11 @@ export interface CreateCaseData {
   notes?: string;
   procedures: Omit<Procedure, 'id'>[];
   
+  // Campos de estado
+  is_operated?: boolean;
+  is_billed?: boolean;
+  is_paid?: boolean;
+  
   // Campos de médico ayudante
   assistant_doctor?: number | null;
   assistant_doctor_name?: string | null;
@@ -98,4 +112,17 @@ export interface UpdateCaseData extends Partial<CreateCaseData> {
   is_operated?: boolean;
   is_billed?: boolean;
   is_paid?: boolean;
+}
+
+// Tipos para respuestas de invitaciones
+export interface AssistedCasesResponse {
+  pending_invitations: SurgicalCase[];
+  accepted_cases: SurgicalCase[];
+  total_pending: number;
+  total_accepted: number;
+}
+
+export interface InvitationResponse {
+  message: string;
+  case?: SurgicalCase;
 }

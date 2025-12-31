@@ -10,10 +10,12 @@ import { useAdSystem, useIsMobile } from "@/shared/hooks/useAdSystem";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
+import { Badge } from "@/shared/components/ui/badge";
 import { surgicalCaseService } from "@/services/surgicalCaseService";
 import { notificationService } from "@/services/notificationService";
 import { advertisementService, type ActiveAd } from "@/admin/services/advertisementService";
 import { useToast } from "@/shared/hooks/useToast";
+import { ReadOnlyBadge } from "@/pages/cases/ReadOnlyBadge";
 import type { SurgicalCase } from "@/types/surgical-case";
 import { Link } from "react-router-dom";
 import { Loader2, Check } from 'lucide-react';
@@ -30,7 +32,9 @@ import {
   Filter,
   ExternalLink,
   Loader2 as LoaderIcon,
-  Lock
+  Lock,
+  UserCheck,
+  Users
 } from "lucide-react";
 
 // Componente CaseStatusToggles inline
@@ -53,10 +57,18 @@ function CaseStatusToggles({
   const isBilled = surgicalCase.is_billed ?? false;
   const isPaid = surgicalCase.is_paid ?? false;
 
+  // Verificar si puede editar
+  const canEdit = surgicalCase.can_edit ?? true;
+
   const handleToggle = async (
     type: 'operated' | 'billed' | 'paid',
     currentValue: boolean
   ) => {
+    if (!canEdit) {
+      onError('No tienes permisos para modificar este caso');
+      return;
+    }
+
     setUpdating(type);
     try {
       let updated: SurgicalCase;
@@ -100,7 +112,7 @@ function CaseStatusToggles({
         variant={isOperated ? 'default' : 'outline'}
         size={buttonSize}
         onClick={() => handleToggle('operated', isOperated)}
-        disabled={updating !== null}
+        disabled={updating !== null || !canEdit}
         className={
           isOperated 
             ? 'bg-blue-600 hover:bg-blue-700 text-white' 
@@ -116,7 +128,7 @@ function CaseStatusToggles({
         variant={isBilled ? 'default' : 'outline'}
         size={buttonSize}
         onClick={() => handleToggle('billed', isBilled)}
-        disabled={updating !== null || (!isOperated && !isBilled)}
+        disabled={updating !== null || (!isOperated && !isBilled) || !canEdit}
         className={
           isBilled 
             ? 'bg-purple-600 hover:bg-purple-700 text-white' 
@@ -132,7 +144,7 @@ function CaseStatusToggles({
         variant={isPaid ? 'default' : 'outline'}
         size={buttonSize}
         onClick={() => handleToggle('paid', isPaid)}
-        disabled={updating !== null || (!isBilled && !isPaid)}
+        disabled={updating !== null || (!isBilled && !isPaid) || !canEdit}
         className={
           isPaid 
             ? 'bg-green-600 hover:bg-green-700 text-white' 
@@ -238,6 +250,15 @@ const CasesPage = () => {
     const caseToDelete = cases.find(c => c.id === id);
     
     if (caseToDelete) {
+      // Verificar si puede editar
+      if (!surgicalCaseService.canEdit(caseToDelete)) {
+        toast.error(
+          'No se puede eliminar',
+          'No tienes permisos para eliminar este caso'
+        );
+        return;
+      }
+
       const canDeleteCheck = surgicalCaseService.canDelete(caseToDelete);
       
       if (!canDeleteCheck.allowed) {
@@ -427,12 +448,20 @@ const CasesPage = () => {
                 {filteredCases.length} de {cases.length} caso{cases.length !== 1 ? 's' : ''}
               </p>
             </div>
-            <Button asChild className="w-full sm:w-auto">
-              <Link to="/cases/new">
-                <Plus className="w-4 h-4 mr-2" />
-                Nuevo Caso
-              </Link>
-            </Button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button asChild variant="outline" className="flex-1 sm:flex-none">
+                <Link to="/cases/invitations">
+                  <UserCheck className="w-4 h-4 mr-2" />
+                  Invitaciones
+                </Link>
+              </Button>
+              <Button asChild className="flex-1 sm:flex-none">
+                <Link to="/cases/new">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuevo Caso
+                </Link>
+              </Button>
+            </div>
           </div>
 
           {cases.length > 0 && (
@@ -510,100 +539,126 @@ const CasesPage = () => {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredCases.map((surgicalCase, index) => (
-                <React.Fragment key={`case-${surgicalCase.id}`}>
-                  <Card className="hover:border-primary transition-colors">
-                    <CardHeader>
-                      <div className="flex items-center justify-between mb-2">
-                        <CardTitle className="text-lg font-semibold">{surgicalCase.patient_name}</CardTitle>
-                        {getStatusBadge(surgicalCase.status)}
-                      </div>
-                      <CardDescription className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm">
-                          <div className="p-1.5 bg-blue-500/10 rounded-lg">
-                            <Calendar className="w-4 h-4 text-blue-500" />
-                          </div>
-                          <span>{new Date(surgicalCase.surgery_date).toLocaleDateString()}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-base">
-                          <div className="p-1.5 bg-purple-500/10 rounded-lg">
-                            <Hospital className="w-4 h-4 text-purple-500" />
-                          </div>
-                          <span className="truncate">{surgicalCase.hospital_name}</span>
-                        </div>
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <CaseStatusToggles
-                        surgicalCase={surgicalCase}
-                        onUpdate={handleCaseUpdate}
-                        onError={handleCaseError}
-                        compact={true}
-                      />
-
-                      <div className="grid grid-cols-3 gap-2 text-center pt-2 border-t">
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">Procedimientos</div>
-                          <div className="text-lg font-semibold">{surgicalCase.procedure_count || 0}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">RVU Total</div>
-                          <div className="text-lg font-semibold">{surgicalCase.total_rvu || 0}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">Valor</div>
-                          <div className="text-lg font-semibold">
-                            ${(surgicalCase.total_value || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              {filteredCases.map((surgicalCase, index) => {
+                const canEdit = surgicalCase.can_edit ?? true;
+                const isOwner = surgicalCase.is_owner ?? true;
+                
+                return (
+                  <React.Fragment key={`case-${surgicalCase.id}`}>
+                    <Card className="hover:border-primary transition-colors">
+                      <CardHeader>
+                        <div className="flex items-center justify-between mb-2">
+                          <CardTitle className="text-lg font-semibold">{surgicalCase.patient_name}</CardTitle>
+                          <div className="flex items-center gap-2">
+                            {getStatusBadge(surgicalCase.status)}
                           </div>
                         </div>
-                      </div>
-
-                      {surgicalCase.primary_specialty && (
-                        <div className="text-center py-2 border-t">
-                          <span className="text-sm text-muted-foreground">
-                            {surgicalCase.primary_specialty}
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="flex gap-2 pt-2 border-t">
-                        <Button asChild variant="ghost" size="sm" className="flex-1">
-                          <Link to={`/cases/${surgicalCase.id}`}>
-                            <Eye className="w-4 h-4 mr-1" />
-                            Ver
-                          </Link>
-                        </Button>
-                        <Button asChild variant="ghost" size="sm" className="flex-1">
-                          <Link to={`/cases/${surgicalCase.id}/edit`}>
-                            <Edit className="w-4 h-4 mr-1" />
-                            Editar
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(surgicalCase.id, surgicalCase.patient_name)}
-                          className="flex-1 hover:text-destructive"
-                          disabled={deletingId === surgicalCase.id || !(surgicalCase.is_paid ?? false)}
-                          title={!(surgicalCase.is_paid ?? false) ? 'Solo se puede eliminar después de cobrar' : 'Eliminar caso'}
-                        >
-                          {deletingId === surgicalCase.id ? (
-                            <div className="w-4 h-4 border-2 border-destructive border-t-transparent rounded-full animate-spin" />
-                          ) : !(surgicalCase.is_paid ?? false) ? (
-                            <Lock className="w-4 h-4" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
+                        {!isOwner && (
+                          <div className="mb-2">
+                            <ReadOnlyBadge />
+                          </div>
+                        )}
+                        <CardDescription className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="p-1.5 bg-blue-500/10 rounded-lg">
+                              <Calendar className="w-4 h-4 text-blue-500" />
+                            </div>
+                            <span>{new Date(surgicalCase.surgery_date).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-base">
+                            <div className="p-1.5 bg-purple-500/10 rounded-lg">
+                              <Hospital className="w-4 h-4 text-purple-500" />
+                            </div>
+                            <span className="truncate">{surgicalCase.hospital_name}</span>
+                          </div>
+                          {!isOwner && surgicalCase.created_by_name && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <div className="p-1.5 bg-orange-500/10 rounded-lg">
+                                <Users className="w-4 h-4 text-orange-500" />
+                              </div>
+                              <span className="text-xs">Creado por: {surgicalCase.created_by_name}</span>
+                            </div>
                           )}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {isOwner && (
+                          <CaseStatusToggles
+                            surgicalCase={surgicalCase}
+                            onUpdate={handleCaseUpdate}
+                            onError={handleCaseError}
+                            compact={true}
+                          />
+                        )}
 
-                  {(index + 1) % 6 === 0 && (
-                    <BetweenContentAd index={Math.floor(index / 6)} />
-                  )}
-                </React.Fragment>
-              ))}
+                        <div className="grid grid-cols-3 gap-2 text-center pt-2 border-t">
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">Procedimientos</div>
+                            <div className="text-lg font-semibold">{surgicalCase.procedure_count || 0}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">RVU Total</div>
+                            <div className="text-lg font-semibold">{surgicalCase.total_rvu || 0}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">Valor</div>
+                            <div className="text-lg font-semibold">
+                              ${(surgicalCase.total_value || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                            </div>
+                          </div>
+                        </div>
+
+                        {surgicalCase.primary_specialty && (
+                          <div className="text-center py-2 border-t">
+                            <span className="text-sm text-muted-foreground">
+                              {surgicalCase.primary_specialty}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2 pt-2 border-t">
+                          <Button asChild variant="ghost" size="sm" className="flex-1">
+                            <Link to={`/cases/${surgicalCase.id}`}>
+                              <Eye className="w-4 h-4 mr-1" />
+                              Ver
+                            </Link>
+                          </Button>
+                          {canEdit && (
+                            <Button asChild variant="ghost" size="sm" className="flex-1">
+                              <Link to={`/cases/${surgicalCase.id}/edit`}>
+                                <Edit className="w-4 h-4 mr-1" />
+                                Editar
+                              </Link>
+                            </Button>
+                          )}
+                          {canEdit && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(surgicalCase.id, surgicalCase.patient_name)}
+                              className="flex-1 hover:text-destructive"
+                              disabled={deletingId === surgicalCase.id || !(surgicalCase.is_paid ?? false)}
+                              title={!(surgicalCase.is_paid ?? false) ? 'Solo se puede eliminar después de cobrar' : 'Eliminar caso'}
+                            >
+                              {deletingId === surgicalCase.id ? (
+                                <div className="w-4 h-4 border-2 border-destructive border-t-transparent rounded-full animate-spin" />
+                              ) : !(surgicalCase.is_paid ?? false) ? (
+                                <Lock className="w-4 h-4" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {(index + 1) % 6 === 0 && (
+                      <BetweenContentAd index={Math.floor(index / 6)} />
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </div>
           )}
         </div>
@@ -644,3 +699,4 @@ const CasesPage = () => {
 };
 
 export default CasesPage;
+          

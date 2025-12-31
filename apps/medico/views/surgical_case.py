@@ -1,4 +1,4 @@
-#apps/medico/views/surgical_case.py
+# apps/medico/views/surgical_case.py
 
 """
 ViewSets para casos quirúrgicos
@@ -24,20 +24,41 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
     ViewSet para gestionar casos quirúrgicos completos.
     
     Endpoints:
-    - GET /api/cases/ - Listar casos del usuario
+    - GET /api/cases/ - Listar casos del usuario (propios + asistidos)
     - POST /api/cases/ - Crear nuevo caso
     - GET /api/cases/{id}/ - Ver detalle de caso
     - PUT/PATCH /api/cases/{id}/ - Actualizar caso
     - DELETE /api/cases/{id}/ - Eliminar caso
     - GET /api/cases/stats/ - Obtener estadísticas
+    - GET /api/cases/assisted/ - Ver casos donde soy ayudante
+    - POST /api/cases/{id}/accept-invitation/ - Aceptar invitación como ayudante
+    - POST /api/cases/{id}/reject-invitation/ - Rechazar invitación como ayudante
     """
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        """Retornar solo casos del usuario autenticado"""
-        queryset = SurgicalCase.objects.filter(
-            created_by=self.request.user
-        ).select_related('hospital', 'created_by').prefetch_related('procedures')
+        """Retornar casos del usuario autenticado (propios + donde es ayudante)"""
+        user = self.request.user
+        
+        # Verificar si se pide solo casos asistidos
+        assisted_only = self.request.query_params.get('assisted_only', 'false').lower() == 'true'
+        
+        if assisted_only:
+            # Solo casos donde soy ayudante
+            queryset = SurgicalCase.objects.filter(
+                assistant_doctor=user
+            )
+        else:
+            # Casos propios O donde soy ayudante
+            queryset = SurgicalCase.objects.filter(
+                Q(created_by=user) | Q(assistant_doctor=user)
+            )
+        
+        queryset = queryset.select_related(
+            'hospital', 
+            'created_by',
+            'assistant_doctor'
+        ).prefetch_related('procedures').distinct()
         
         # Filtros opcionales
         status_filter = self.request.query_params.get('status', None)
@@ -75,33 +96,172 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
         else:
             return SurgicalCaseDetailSerializer
     
+    def get_serializer_context(self):
+        """Agregar request al contexto del serializer"""
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+    
+    def retrieve(self, request, *args, **kwargs):
+        """Obtener detalle de un caso (verificando permisos)"""
+        instance = self.get_object()
+        
+        # Verificar que el usuario pueda ver este caso
+        if not instance.can_be_viewed_by(request.user):
+            return Response(
+                {'error': 'No tienes permiso para ver este caso'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+    
     def create(self, request, *args, **kwargs):
         """Crear un nuevo caso quirúrgico"""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         case = serializer.save(created_by=request.user)
         
-        detail_serializer = SurgicalCaseDetailSerializer(case)
+        detail_serializer = SurgicalCaseDetailSerializer(case, context={'request': request})
         return Response(detail_serializer.data, status=status.HTTP_201_CREATED)
     
     def update(self, request, *args, **kwargs):
         """Actualizar caso completo"""
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
+        
+        # Verificar permisos de edición
+        if not instance.can_be_edited_by(request.user):
+            return Response(
+                {'error': 'Solo el creador del caso puede editarlo'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         case = serializer.save()
         
         # Retornar con serializer detallado
-        detail_serializer = SurgicalCaseDetailSerializer(case)
+        detail_serializer = SurgicalCaseDetailSerializer(case, context={'request': request})
         return Response(detail_serializer.data)
+    
+    def destroy(self, request, *args, **kwargs):
+        """Eliminar caso (solo si está pagado y es el creador)"""
+        instance = self.get_object()
+        
+        # Verificar permisos
+        if not instance.can_be_edited_by(request.user):
+            return Response(
+                {'error': 'Solo el creador del caso puede eliminarlo'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Verificar que esté pagado
+        if not instance.can_be_deleted():
+            return Response(
+                {'error': 'Solo se pueden eliminar casos que ya han sido cobrados'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    @action(detail=False, methods=['get'], url_path='assisted')
+    def get_assisted_cases(self, request):
+        """
+        Obtener casos donde el usuario actual es ayudante
+        """
+        cases = SurgicalCase.objects.filter(
+            assistant_doctor=request.user
+        ).select_related(
+            'hospital', 
+            'created_by'
+        ).prefetch_related('procedures')
+        
+        # Separar en pendientes y aceptados
+        pending_cases = cases.filter(assistant_accepted=False)
+        accepted_cases = cases.filter(assistant_accepted=True)
+        
+        pending_serializer = SurgicalCaseListSerializer(
+            pending_cases, 
+            many=True,
+            context={'request': request}
+        )
+        accepted_serializer = SurgicalCaseListSerializer(
+            accepted_cases, 
+            many=True,
+            context={'request': request}
+        )
+        
+        return Response({
+            'pending_invitations': pending_serializer.data,
+            'accepted_cases': accepted_serializer.data,
+            'total_pending': pending_cases.count(),
+            'total_accepted': accepted_cases.count()
+        })
+    
+    @action(detail=True, methods=['post'], url_path='accept-invitation')
+    def accept_invitation(self, request, pk=None):
+        """
+        Aceptar invitación como médico ayudante
+        """
+        case = self.get_object()
+        
+        # Verificar que el usuario es el ayudante asignado
+        if case.assistant_doctor != request.user:
+            return Response(
+                {'error': 'No eres el médico ayudante asignado a este caso'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Verificar que no haya aceptado ya
+        if case.assistant_accepted:
+            return Response(
+                {'message': 'Ya has aceptado esta invitación'},
+                status=status.HTTP_200_OK
+            )
+        
+        # Aceptar invitación
+        case.assistant_accepted = True
+        case.save()
+        
+        serializer = SurgicalCaseDetailSerializer(case, context={'request': request})
+        return Response({
+            'message': 'Invitación aceptada exitosamente',
+            'case': serializer.data
+        }, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['post'], url_path='reject-invitation')
+    def reject_invitation(self, request, pk=None):
+        """
+        Rechazar invitación como médico ayudante
+        (Esto simplemente marca como no aceptado, el creador puede reasignar)
+        """
+        case = self.get_object()
+        
+        # Verificar que el usuario es el ayudante asignado
+        if case.assistant_doctor != request.user:
+            return Response(
+                {'error': 'No eres el médico ayudante asignado a este caso'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Rechazar invitación (marcar como no aceptado)
+        case.assistant_accepted = False
+        case.save()
+        
+        return Response({
+            'message': 'Invitación rechazada. El creador del caso será notificado.'
+        }, status=status.HTTP_200_OK)
     
     @action(detail=False, methods=['get'], url_path='stats')
     def get_stats(self, request):
         """
-        Obtener estadísticas de casos del usuario
+        Obtener estadísticas de casos del usuario (solo casos propios, no asistidos)
         """
-        queryset = self.get_queryset()
+        queryset = SurgicalCase.objects.filter(
+            created_by=request.user
+        ).select_related('hospital').prefetch_related('procedures')
         
         # Total de casos
         total_cases = queryset.count()
@@ -155,7 +315,11 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
         
         # Casos recientes (últimos 5)
         recent_cases = queryset.order_by('-surgery_date', '-created_at')[:5]
-        recent_serializer = SurgicalCaseListSerializer(recent_cases, many=True)
+        recent_serializer = SurgicalCaseListSerializer(
+            recent_cases, 
+            many=True,
+            context={'request': request}
+        )
         
         stats_data = {
             'total_cases': total_cases,
@@ -175,6 +339,13 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
         Body: { "surgery_code": "...", "surgery_name": "...", ... }
         """
         case = self.get_object()
+        
+        # Verificar permisos de edición
+        if not case.can_be_edited_by(request.user):
+            return Response(
+                {'error': 'Solo el creador del caso puede agregar procedimientos'},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         serializer = CaseProcedureSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -201,6 +372,13 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
         """
         case = self.get_object()
         
+        # Verificar permisos de edición
+        if not case.can_be_edited_by(request.user):
+            return Response(
+                {'error': 'Solo el creador del caso puede eliminar procedimientos'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         try:
             procedure = case.procedures.get(id=procedure_id)
             procedure.delete()
@@ -221,6 +399,14 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
         Body: { "status": "completed" }
         """
         case = self.get_object()
+        
+        # Verificar permisos de edición
+        if not case.can_be_edited_by(request.user):
+            return Response(
+                {'error': 'Solo el creador del caso puede cambiar el estado'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         new_status = request.data.get('status')
         
         if not new_status:
@@ -239,7 +425,7 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
         case.status = new_status
         case.save()
         
-        serializer = SurgicalCaseDetailSerializer(case)
+        serializer = SurgicalCaseDetailSerializer(case, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -253,5 +439,6 @@ class CaseProcedureViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Retornar solo procedimientos de casos del usuario"""
         return CaseProcedure.objects.filter(
-            case__created_by=self.request.user
-        ).select_related('case', 'case__hospital')
+            Q(case__created_by=self.request.user) | 
+            Q(case__assistant_doctor=self.request.user)
+        ).select_related('case', 'case__hospital').distinct()

@@ -4,6 +4,7 @@ from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db.models import Sum, Count, Q
+from django.utils import timezone
 
 
 class SurgicalCase(models.Model):
@@ -70,7 +71,7 @@ class SurgicalCase(models.Model):
         verbose_name="Estado"
     )
     
-    # Nuevos campos de estado del proceso
+    # Campos de estado del proceso
     is_operated = models.BooleanField(
         default=False,
         verbose_name="Operado",
@@ -87,7 +88,7 @@ class SurgicalCase(models.Model):
         help_text="Indica si la cirugía ya fue cobrada"
     )
     
-    # Médico ayudante - NUEVOS CAMPOS
+    # Médico ayudante
     assistant_doctor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -103,6 +104,17 @@ class SurgicalCase(models.Model):
         null=True,
         verbose_name="Nombre del Médico Ayudante",
         help_text="Nombre manual del médico ayudante (si no es un colega registrado)"
+    )
+    assistant_accepted = models.BooleanField(
+        default=False,
+        verbose_name="Ayudante Aceptó",
+        help_text="Indica si el médico ayudante aceptó participar en este caso"
+    )
+    assistant_notified_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="Fecha de Notificación al Ayudante",
+        help_text="Cuándo se notificó al ayudante sobre este caso"
     )
     
     # Información clínica
@@ -174,7 +186,24 @@ class SurgicalCase(models.Model):
             })
     
     def save(self, *args, **kwargs):
-        """Override save para ejecutar validaciones"""
+        """Override save para ejecutar validaciones y notificar"""
+        # Detectar si se cambió el assistant_doctor
+        if self.pk:
+            try:
+                old_instance = SurgicalCase.objects.get(pk=self.pk)
+                # Si cambió el ayudante, resetear la aceptación
+                if old_instance.assistant_doctor != self.assistant_doctor:
+                    self.assistant_accepted = False
+                    # Si hay un nuevo ayudante, notificar
+                    if self.assistant_doctor:
+                        self.assistant_notified_at = timezone.now()
+            except SurgicalCase.DoesNotExist:
+                pass
+        else:
+            # Caso nuevo con ayudante
+            if self.assistant_doctor:
+                self.assistant_notified_at = timezone.now()
+        
         self.full_clean()
         super().save(*args, **kwargs)
     
@@ -189,6 +218,23 @@ class SurgicalCase(models.Model):
                 "No se puede eliminar una cirugía que no ha sido cobrada"
             )
         super().delete(*args, **kwargs)
+    
+    def can_be_viewed_by(self, user):
+        """Verificar si un usuario puede ver este caso"""
+        # El creador siempre puede ver
+        if self.created_by == user:
+            return True
+        
+        # El ayudante asignado puede ver
+        if self.assistant_doctor == user:
+            return True
+        
+        return False
+    
+    def can_be_edited_by(self, user):
+        """Verificar si un usuario puede editar este caso"""
+        # Solo el creador puede editar
+        return self.created_by == user
     
     @property
     def assistant_display_name(self):

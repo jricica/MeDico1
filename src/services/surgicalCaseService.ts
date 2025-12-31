@@ -1,7 +1,15 @@
 // src/services/surgicalCaseService.ts
 
 import { authService } from '@/shared/services/authService';
-import type { SurgicalCase, CreateCaseData, UpdateCaseData, CaseStats } from '@/types/surgical-case';
+import type { 
+  SurgicalCase, 
+  CreateCaseData, 
+  UpdateCaseData, 
+  CaseStats,
+  AssistedCasesResponse,
+  InvitationResponse,
+  Procedure
+} from '@/types/surgical-case';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -42,14 +50,31 @@ class SurgicalCaseService {
     return await response.json();
   }
 
+  // ==================== CASOS PROPIOS ====================
+
   /**
    * Get all surgical cases
    */
-  async getCases(): Promise<SurgicalCase[]> {
+  async getCases(params?: {
+    status?: string;
+    hospital?: number;
+    date_from?: string;
+    date_to?: string;
+    search?: string;
+    assisted_only?: boolean;
+  }): Promise<SurgicalCase[]> {
     try {
-      const response = await authService.authenticatedFetch(
-        `${API_URL}/api/v1/medico/cases/`
-      );
+      const queryParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            queryParams.append(key, String(value));
+          }
+        });
+      }
+      
+      const url = `${API_URL}/api/v1/medico/cases/${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      const response = await authService.authenticatedFetch(url);
       return await this.handleResponse<SurgicalCase[]>(response);
     } catch (error: any) {
       console.error('Error fetching cases:', error);
@@ -193,6 +218,128 @@ class SurgicalCaseService {
   }
 
   /**
+   * Actualizar solo el estado de un caso
+   */
+  async updateStatus(id: number, status: string): Promise<SurgicalCase> {
+    try {
+      const response = await authService.authenticatedFetch(
+        `${API_URL}/api/v1/medico/cases/${id}/update-status/`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ status }),
+        }
+      );
+      return await this.handleResponse<SurgicalCase>(response);
+    } catch (error: any) {
+      console.error('Error updating status:', error);
+      throw error;
+    }
+  }
+
+  // ==================== PROCEDIMIENTOS ====================
+
+  /**
+   * Agregar un procedimiento a un caso existente
+   */
+  async addProcedure(caseId: number, procedure: Omit<Procedure, 'id'>): Promise<Procedure> {
+    try {
+      const response = await authService.authenticatedFetch(
+        `${API_URL}/api/v1/medico/cases/${caseId}/add-procedure/`,
+        {
+          method: 'POST',
+          body: JSON.stringify(procedure),
+        }
+      );
+      return await this.handleResponse<Procedure>(response);
+    } catch (error: any) {
+      console.error('Error adding procedure:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Eliminar un procedimiento de un caso
+   */
+  async removeProcedure(caseId: number, procedureId: number): Promise<void> {
+    try {
+      const response = await authService.authenticatedFetch(
+        `${API_URL}/api/v1/medico/cases/${caseId}/remove-procedure/${procedureId}/`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type');
+        if (contentType?.includes('application/json')) {
+          const error = await response.json();
+          throw new Error(error.detail || 'Failed to remove procedure');
+        }
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+    } catch (error: any) {
+      console.error('Error removing procedure:', error);
+      throw error;
+    }
+  }
+
+  // ==================== CASOS ASISTIDOS ====================
+
+  /**
+   * Obtener casos donde el usuario es ayudante
+   * Separa en invitaciones pendientes y casos aceptados
+   */
+  async getAssistedCases(): Promise<AssistedCasesResponse> {
+    try {
+      const response = await authService.authenticatedFetch(
+        `${API_URL}/api/v1/medico/cases/assisted/`
+      );
+      return await this.handleResponse<AssistedCasesResponse>(response);
+    } catch (error: any) {
+      console.error('Error fetching assisted cases:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Aceptar una invitación como médico ayudante
+   */
+  async acceptInvitation(caseId: number): Promise<InvitationResponse> {
+    try {
+      const response = await authService.authenticatedFetch(
+        `${API_URL}/api/v1/medico/cases/${caseId}/accept-invitation/`,
+        {
+          method: 'POST',
+        }
+      );
+      return await this.handleResponse<InvitationResponse>(response);
+    } catch (error: any) {
+      console.error('Error accepting invitation:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Rechazar una invitación como médico ayudante
+   */
+  async rejectInvitation(caseId: number): Promise<InvitationResponse> {
+    try {
+      const response = await authService.authenticatedFetch(
+        `${API_URL}/api/v1/medico/cases/${caseId}/reject-invitation/`,
+        {
+          method: 'POST',
+        }
+      );
+      return await this.handleResponse<InvitationResponse>(response);
+    } catch (error: any) {
+      console.error('Error rejecting invitation:', error);
+      throw error;
+    }
+  }
+
+  // ==================== ESTADOS DE PROCESO ====================
+
+  /**
    * Marcar cirugía como operada
    */
   async toggleOperated(id: number, isOperated: boolean): Promise<SurgicalCase> {
@@ -213,6 +360,8 @@ class SurgicalCaseService {
     return this.updateCase(id, { is_paid: isPaid });
   }
 
+  // ==================== UTILIDADES ====================
+
   /**
    * Verificar si una cirugía puede ser eliminada
    */
@@ -224,6 +373,34 @@ class SurgicalCaseService {
       };
     }
     return { allowed: true };
+  }
+
+  /**
+   * Verificar si el usuario puede editar un caso
+   */
+  canEdit(surgicalCase: SurgicalCase): boolean {
+    return surgicalCase.can_edit ?? false;
+  }
+
+  /**
+   * Verificar si el usuario es el dueño de un caso
+   */
+  isOwner(surgicalCase: SurgicalCase): boolean {
+    return surgicalCase.is_owner ?? false;
+  }
+
+  /**
+   * Verificar si el caso tiene invitación pendiente
+   */
+  hasPendingInvitation(surgicalCase: SurgicalCase): boolean {
+    return !!(surgicalCase.assistant_doctor && !surgicalCase.assistant_accepted);
+  }
+
+  /**
+   * Verificar si el caso está aceptado por el ayudante
+   */
+  isAcceptedByAssistant(surgicalCase: SurgicalCase): boolean {
+    return !!(surgicalCase.assistant_doctor && surgicalCase.assistant_accepted);
   }
 }
 
