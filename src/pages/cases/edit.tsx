@@ -12,8 +12,10 @@ import { useToast } from '@/shared/hooks/useToast';
 import { surgicalCaseService } from '@/services/surgicalCaseService';
 import { hospitalService, type Hospital } from '@/services/hospitalService';
 import { loadCSV } from '@/shared/utils/csvLoader';
-import { Loader2, Plus, X, Search, Calendar, User, Building2, Stethoscope, ArrowLeft, AlertCircle } from 'lucide-react';
+import { Loader2, Plus, X, Search, Calendar, User, Building2, Stethoscope, ArrowLeft, AlertCircle, Users } from 'lucide-react';
 import type { PatientGender } from '@/types/surgical-case';
+import { colleaguesService } from '@/services/colleaguesService';
+
 
 interface ProcedureData {
   codigo: string;
@@ -33,6 +35,12 @@ interface SelectedProcedure {
   notes: string;
 }
 
+interface Colleague {
+  id: number;
+  full_name: string;
+  specialty?: string;
+}
+
 const EditCase = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -49,6 +57,10 @@ const EditCase = () => {
   const [diagnosis, setDiagnosis] = useState('');
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState<'scheduled' | 'completed' | 'billed' | 'paid' | 'cancelled'>('scheduled');
+  // Assistant doctor state
+  const [assistantType, setAssistantType] = useState<'colleague' | 'manual' | 'none'>('none');
+  const [selectedColleagueId, setSelectedColleagueId] = useState<number | null>(null);
+  const [manualAssistantName, setManualAssistantName] = useState('');
   
   // Procedure selection state
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,6 +73,8 @@ const EditCase = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [colleagues, setColleagues] = useState<Colleague[]>([]);
+  const [loadingColleagues, setLoadingColleagues] = useState(false);
 
   // Load case data
   useEffect(() => {
@@ -85,6 +99,16 @@ const EditCase = () => {
       setDiagnosis(caseData.diagnosis || '');
       setNotes(caseData.notes || '');
       setStatus(caseData.status || 'scheduled');
+      // Populate assistant doctor
+      if (caseData.assistant_doctor) {
+        setAssistantType('colleague');
+        setSelectedColleagueId(caseData.assistant_doctor);
+      } else if (caseData.assistant_doctor_name) {
+        setAssistantType('manual');
+        setManualAssistantName(caseData.assistant_doctor_name);
+      } else {
+        setAssistantType('none');
+      }
       
       // Populate procedures
       if (caseData.procedures && caseData.procedures.length > 0) {
@@ -109,13 +133,30 @@ const EditCase = () => {
     }
   };
 
+      // Load colleagues
+      useEffect(() => {
+        const loadColleagues = async () => {
+          try {
+            setLoadingColleagues(true);
+            const data = await colleaguesService.getColleagues();
+            setColleagues(data.colleagues);
+          } catch (error) {
+            console.error('Error loading colleagues:', error);
+          } finally {
+            setLoadingColleagues(false);
+          }
+        };
+
+        loadColleagues();
+      }, []);
+
   // Load hospitals and procedures
   useEffect(() => {
     const loadData = async () => {
       try {
         const hospitalsData = await hospitalService.getHospitals();
         setHospitals(hospitalsData);
-        
+                  
         // Load all CSV files (same structure as new.tsx)
         const folderStructure: Record<string, Record<string, string>> = {
           "Cardiovascular": {
@@ -346,6 +387,9 @@ const EditCase = () => {
         diagnosis: diagnosis || undefined,
         notes: notes || undefined,
         status: status || 'scheduled',
+        // Médico ayudante
+        assistant_doctor: assistantType === 'colleague' ? selectedColleagueId : null,
+        assistant_doctor_name: assistantType === 'manual' ? manualAssistantName : null,
         procedures: selectedProcedures.map((proc, index) => ({
           surgery_code: proc.surgery_code,
           surgery_name: proc.surgery_name,
@@ -554,6 +598,87 @@ const EditCase = () => {
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Assistant Doctor */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Médico Ayudante
+              </CardTitle>
+              <CardDescription>Selecciona un colega o ingresa el nombre manualmente (opcional)</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="assistantType">Tipo de Ayudante</Label>
+                <Select value={assistantType} onValueChange={(value: any) => {
+                  setAssistantType(value);
+                  if (value === 'none') {
+                    setSelectedColleagueId(null);
+                    setManualAssistantName('');
+                  }
+                }}>
+                  <SelectTrigger id="assistantType">
+                    <SelectValue placeholder="Selecciona una opción" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin ayudante</SelectItem>
+                    <SelectItem value="colleague">Seleccionar colega</SelectItem>
+                    <SelectItem value="manual">Ingresar nombre manualmente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {assistantType === 'colleague' && (
+                <div className="space-y-2">
+                  <Label htmlFor="colleague">Seleccionar Colega</Label>
+                  {loadingColleagues ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground p-4 border rounded-lg">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Cargando colegas...
+                    </div>
+                  ) : colleagues.length === 0 ? (
+                    <div className="text-sm text-muted-foreground p-4 border rounded-lg bg-muted/50">
+                      No tienes colegas agregados. Ve a la sección de Colegas para agregar algunos.
+                    </div>
+                  ) : (
+                    <Select 
+                      value={selectedColleagueId?.toString() || ''} 
+                      onValueChange={(value) => setSelectedColleagueId(parseInt(value))}
+                    >
+                      <SelectTrigger id="colleague">
+                        <SelectValue placeholder="Selecciona un colega" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px]">
+                        {colleagues.map((colleague) => (
+                          <SelectItem key={colleague.id} value={colleague.id.toString()}>
+                            <div className="flex flex-col">
+                              <span>{colleague.full_name}</span>
+                              {colleague.specialty && (
+                                <span className="text-xs text-muted-foreground">{colleague.specialty}</span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              )}
+
+              {assistantType === 'manual' && (
+                <div className="space-y-2">
+                  <Label htmlFor="manualAssistant">Nombre del Médico Ayudante</Label>
+                  <Input
+                    id="manualAssistant"
+                    value={manualAssistantName}
+                    onChange={(e) => setManualAssistantName(e.target.value)}
+                    placeholder="Ej: Dr. Juan Pérez"
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
 

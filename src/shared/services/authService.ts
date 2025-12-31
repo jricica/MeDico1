@@ -2,7 +2,7 @@
  * Servicio de Autenticación para MeDico
  * Maneja todas las operaciones relacionadas con autenticación JWT
  */
-
+//src/shared/services/authService.ts
 import { parseAuthError, NetworkError, TokenRefreshError } from './authErrors';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';

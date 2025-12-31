@@ -11,8 +11,9 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { useToast } from '@/shared/hooks/useToast';
 import { surgicalCaseService } from '@/services/surgicalCaseService';
 import { hospitalService, type Hospital } from '@/services/hospitalService';
+import { colleaguesService } from '@/services/colleaguesService';
 import { loadCSV } from '@/shared/utils/csvLoader';
-import { Loader2, Plus, X, Search, Calendar, User, Building2, Stethoscope, Star } from 'lucide-react';
+import { Loader2, Plus, X, Search, Calendar, User, Building2, Stethoscope, Star, Users } from 'lucide-react';
 import type { PatientGender } from '@/types/surgical-case';
 
 interface ProcedureData {
@@ -33,6 +34,12 @@ interface SelectedProcedure {
   notes: string;
 }
 
+interface Colleague {
+  id: number;
+  full_name: string;
+  specialty?: string;
+}
+
 const NewCase = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -48,6 +55,11 @@ const NewCase = () => {
   const [diagnosis, setDiagnosis] = useState('');
   const [notes, setNotes] = useState('');
   
+  // Assistant doctor state
+  const [assistantType, setAssistantType] = useState<'colleague' | 'manual' | 'none'>('none');
+  const [selectedColleagueId, setSelectedColleagueId] = useState<number | null>(null);
+  const [manualAssistantName, setManualAssistantName] = useState('');
+  
   // Procedure selection state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProcedures, setSelectedProcedures] = useState<SelectedProcedure[]>([]);
@@ -55,8 +67,10 @@ const NewCase = () => {
   
   // Data state
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
+  const [colleagues, setColleagues] = useState<Colleague[]>([]);
   const [allProcedures, setAllProcedures] = useState<ProcedureData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingColleagues, setLoadingColleagues] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Load hospitals and procedures
@@ -173,6 +187,23 @@ const NewCase = () => {
     loadData();
   }, [toast]);
 
+  // Load colleagues
+  useEffect(() => {
+    const loadColleagues = async () => {
+      try {
+        setLoadingColleagues(true);
+        const data = await colleaguesService.getColleagues();
+        setColleagues(data.colleagues);
+      } catch (error) {
+        console.error('Error loading colleagues:', error);
+      } finally {
+        setLoadingColleagues(false);
+      }
+    };
+
+    loadColleagues();
+  }, []);
+
   // Filter procedures based on search
   const filteredProcedures = useMemo(() => {
     if (!searchQuery) return [];
@@ -212,7 +243,6 @@ const NewCase = () => {
     setSearchQuery('');
     setShowProcedureSearch(false);
     
-    // Toast cuando se agrega un procedimiento
     toast.success(
       'Procedimiento agregado',
       `${proc.cirugia} agregado exitosamente`
@@ -223,7 +253,6 @@ const NewCase = () => {
     const removedProc = selectedProcedures[index];
     setSelectedProcedures(selectedProcedures.filter((_, i) => i !== index));
     
-    // Toast cuando se elimina un procedimiento
     toast.info(
       'Procedimiento eliminado',
       `${removedProc.surgery_name} fue eliminado de la lista`
@@ -282,6 +311,9 @@ const NewCase = () => {
         surgery_time: surgeryTime || undefined,
         diagnosis: diagnosis || undefined,
         notes: notes || undefined,
+        // Médico ayudante
+        assistant_doctor: assistantType === 'colleague' ? selectedColleagueId : null,
+        assistant_doctor_name: assistantType === 'manual' ? manualAssistantName : null,
         procedures: selectedProcedures.map((proc, index) => ({
           surgery_code: proc.surgery_code,
           surgery_name: proc.surgery_name,
@@ -302,7 +334,6 @@ const NewCase = () => {
         `El caso de ${patientName} ha sido registrado correctamente con ${selectedProcedures.length} procedimiento${selectedProcedures.length !== 1 ? 's' : ''}`
       );
       
-      // Redirect to dashboard (cases list)
       navigate('/cases');
     } catch (error) {
       console.error('Error creating case:', error);
@@ -472,6 +503,87 @@ const NewCase = () => {
             </CardContent>
           </Card>
 
+          {/* Assistant Doctor - NUEVO */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Médico Ayudante
+              </CardTitle>
+              <CardDescription>Selecciona un colega o ingresa el nombre manualmente (opcional)</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="assistantType">Tipo de Ayudante</Label>
+                <Select value={assistantType} onValueChange={(value: any) => {
+                  setAssistantType(value);
+                  if (value === 'none') {
+                    setSelectedColleagueId(null);
+                    setManualAssistantName('');
+                  }
+                }}>
+                  <SelectTrigger id="assistantType">
+                    <SelectValue placeholder="Selecciona una opción" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin ayudante</SelectItem>
+                    <SelectItem value="colleague">Seleccionar colega</SelectItem>
+                    <SelectItem value="manual">Ingresar nombre manualmente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {assistantType === 'colleague' && (
+                <div className="space-y-2">
+                  <Label htmlFor="colleague">Seleccionar Colega</Label>
+                  {loadingColleagues ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground p-4 border rounded-lg">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Cargando colegas...
+                    </div>
+                  ) : colleagues.length === 0 ? (
+                    <div className="text-sm text-muted-foreground p-4 border rounded-lg bg-muted/50">
+                      No tienes colegas agregados. Ve a la sección de Colegas para agregar algunos.
+                    </div>
+                  ) : (
+                    <Select 
+                      value={selectedColleagueId?.toString() || ''} 
+                      onValueChange={(value) => setSelectedColleagueId(parseInt(value))}
+                    >
+                      <SelectTrigger id="colleague">
+                        <SelectValue placeholder="Selecciona un colega" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px]">
+                        {colleagues.map((colleague) => (
+                          <SelectItem key={colleague.id} value={colleague.id.toString()}>
+                            <div className="flex flex-col">
+                              <span>{colleague.full_name}</span>
+                              {colleague.specialty && (
+                                <span className="text-xs text-muted-foreground">{colleague.specialty}</span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              )}
+
+              {assistantType === 'manual' && (
+                <div className="space-y-2">
+                  <Label htmlFor="manualAssistant">Nombre del Médico Ayudante</Label>
+                  <Input
+                    id="manualAssistant"
+                    value={manualAssistantName}
+                    onChange={(e) => setManualAssistantName(e.target.value)}
+                    placeholder="Ej: Dr. Juan Pérez"
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Procedures */}
           <Card>
             <CardHeader>
@@ -489,7 +601,6 @@ const NewCase = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Search Input */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -502,7 +613,6 @@ const NewCase = () => {
                   className="pl-10"
                 />
                 
-                {/* Search Results Dropdown */}
                 {showProcedureSearch && filteredProcedures.length > 0 && (
                   <Card className="absolute z-10 mt-2 w-full max-h-80 overflow-y-auto">
                     <CardContent className="p-2">
@@ -524,7 +634,6 @@ const NewCase = () => {
                 )}
               </div>
 
-              {/* Selected Procedures */}
               {selectedProcedures.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Stethoscope className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -571,7 +680,6 @@ const NewCase = () => {
                 </div>
               )}
 
-              {/* Totals */}
               {selectedProcedures.length > 0 && hospitalId && (
                 <div className="pt-4 border-t space-y-2">
                   <div className="flex justify-between text-sm">

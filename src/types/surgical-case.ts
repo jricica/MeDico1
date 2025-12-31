@@ -56,10 +56,15 @@ export interface SurgicalCase {
   notes?: string;
   status: CaseStatus;
   
-  // Nuevos campos de estado (opcionales por compatibilidad)
+  // Campos de estado
   is_operated?: boolean;
   is_billed?: boolean;
   is_paid?: boolean;
+  
+  // Campos de médico ayudante
+  assistant_doctor?: number | null;
+  assistant_doctor_name?: string | null;
+  assistant_display_name?: string;
   
   procedure_count?: number;
   total_rvu?: number;
@@ -82,6 +87,10 @@ export interface CreateCaseData {
   diagnosis?: string;
   notes?: string;
   procedures: Omit<Procedure, 'id'>[];
+  
+  // Campos de médico ayudante
+  assistant_doctor?: number | null;
+  assistant_doctor_name?: string | null;
 }
 
 export interface UpdateCaseData extends Partial<CreateCaseData> {

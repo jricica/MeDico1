@@ -87,6 +87,24 @@ class SurgicalCase(models.Model):
         help_text="Indica si la cirugía ya fue cobrada"
     )
     
+    # Médico ayudante - NUEVOS CAMPOS
+    assistant_doctor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='assisted_cases',
+        blank=True,
+        null=True,
+        verbose_name="Médico Ayudante (Colega)",
+        help_text="Referencia a un colega registrado en el sistema"
+    )
+    assistant_doctor_name = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name="Nombre del Médico Ayudante",
+        help_text="Nombre manual del médico ayudante (si no es un colega registrado)"
+    )
+    
     # Información clínica
     diagnosis = models.TextField(
         blank=True,
@@ -127,6 +145,7 @@ class SurgicalCase(models.Model):
             models.Index(fields=['is_operated']),
             models.Index(fields=['is_billed']),
             models.Index(fields=['is_paid']),
+            models.Index(fields=['assistant_doctor']),
         ]
     
     def __str__(self):
@@ -135,6 +154,12 @@ class SurgicalCase(models.Model):
     def clean(self):
         """Validaciones del modelo"""
         super().clean()
+        
+        # Validar que no se usen ambos campos de ayudante a la vez
+        if self.assistant_doctor and self.assistant_doctor_name:
+            raise ValidationError({
+                'assistant_doctor_name': 'No puedes tener un colega registrado y un nombre manual al mismo tiempo'
+            })
         
         # Validar que no se facture sin operar
         if self.is_billed and not self.is_operated:
@@ -164,6 +189,13 @@ class SurgicalCase(models.Model):
                 "No se puede eliminar una cirugía que no ha sido cobrada"
             )
         super().delete(*args, **kwargs)
+    
+    @property
+    def assistant_display_name(self):
+        """Obtener el nombre del ayudante para mostrar"""
+        if self.assistant_doctor:
+            return self.assistant_doctor.get_full_name() or self.assistant_doctor.username
+        return self.assistant_doctor_name or "Sin ayudante"
     
     @property
     def total_rvu(self):

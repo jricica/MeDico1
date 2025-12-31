@@ -19,6 +19,7 @@ import {
   Clock,
   IdCard,
   AlertCircle,
+  Users, // ← NUEVO
 } from "lucide-react";
 
 const CaseDetailPage = () => {
@@ -227,8 +228,12 @@ const CaseDetailPage = () => {
                   Surgery Details
                 </CardTitle>
               </CardHeader>
+
               <CardContent className="space-y-4">
+
                 <div className="grid grid-cols-2 gap-4">
+
+                  {/* Surgery Date */}
                   <div>
                     <div className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
@@ -243,6 +248,8 @@ const CaseDetailPage = () => {
                       })}
                     </div>
                   </div>
+
+                  {/* Surgery Time */}
                   {surgicalCase.surgery_time && (
                     <div>
                       <div className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
@@ -252,6 +259,8 @@ const CaseDetailPage = () => {
                       <div className="font-medium">{surgicalCase.surgery_time}</div>
                     </div>
                   )}
+
+                  {/* Hospital */}
                   <div className="col-span-2">
                     <div className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
                       <Hospital className="w-4 h-4" />
@@ -259,8 +268,21 @@ const CaseDetailPage = () => {
                     </div>
                     <div className="font-medium">{surgicalCase.hospital_name}</div>
                   </div>
+
+                  {/* NUEVO - Médico Ayudante */}
+                  {surgicalCase.assistant_display_name && surgicalCase.assistant_display_name !== "Sin ayudante" && surgicalCase.assistant_display_name !== "Sin ayudante" && (
+                    <div className="col-span-2">
+                      <div className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
+                        <Users className="w-4 h-4" />
+                        Assistant Doctor
+                      </div>
+                      <div className="font-medium">{surgicalCase.assistant_display_name}</div>
+                    </div>
+                  )}
+
                 </div>
 
+                {/* Diagnosis */}
                 {surgicalCase.diagnosis && (
                   <div>
                     <div className="text-sm text-muted-foreground mb-1">Diagnosis</div>
@@ -270,19 +292,9 @@ const CaseDetailPage = () => {
                   </div>
                 )}
 
-                {surgicalCase.notes && (
-                  <div>
-                    <div className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
-                      <FileText className="w-4 h-4" />
-                      Additional Notes
-                    </div>
-                    <div className="p-3 bg-muted rounded-lg">
-                      <p className="text-sm whitespace-pre-wrap">{surgicalCase.notes}</p>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
+
 
             {/* Procedures */}
             <Card>

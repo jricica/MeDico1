@@ -57,10 +57,13 @@ class SurgicalCaseListSerializer(serializers.ModelSerializer):
     primary_specialty = serializers.CharField(read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     
-    # Nuevos campos de estado
+    # Campos de estado
     is_operated = serializers.BooleanField(default=False)
     is_billed = serializers.BooleanField(default=False)
     is_paid = serializers.BooleanField(default=False)
+    
+    # NUEVOS: Campos de médico ayudante
+    assistant_display_name = serializers.CharField(read_only=True)
     
     class Meta:
         model = SurgicalCase
@@ -75,6 +78,9 @@ class SurgicalCaseListSerializer(serializers.ModelSerializer):
             'is_operated',
             'is_billed',
             'is_paid',
+            'assistant_doctor',
+            'assistant_doctor_name',
+            'assistant_display_name',
             'total_rvu',
             'total_value',
             'procedure_count',
@@ -110,10 +116,13 @@ class SurgicalCaseDetailSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     
-    # Nuevos campos de estado
+    # Campos de estado
     is_operated = serializers.BooleanField(default=False)
     is_billed = serializers.BooleanField(default=False)
     is_paid = serializers.BooleanField(default=False)
+    
+    # NUEVOS: Campos de médico ayudante
+    assistant_display_name = serializers.CharField(read_only=True)
     
     class Meta:
         model = SurgicalCase
@@ -133,6 +142,9 @@ class SurgicalCaseDetailSerializer(serializers.ModelSerializer):
             'is_operated',
             'is_billed',
             'is_paid',
+            'assistant_doctor',
+            'assistant_doctor_name',
+            'assistant_display_name',
             'notes',
             'diagnosis',
             'procedures',
@@ -152,10 +164,23 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
     
     procedures = CaseProcedureSerializer(many=True, required=False)
     
-    # Nuevos campos de estado (opcionales en creación/actualización)
+    # Campos de estado (opcionales en creación/actualización)
     is_operated = serializers.BooleanField(default=False, required=False)
     is_billed = serializers.BooleanField(default=False, required=False)
     is_paid = serializers.BooleanField(default=False, required=False)
+    
+    # NUEVOS: Campos de médico ayudante (opcionales)
+    assistant_doctor = serializers.PrimaryKeyRelatedField(
+        queryset=Hospital.objects.none(),  # Se configurará en __init__
+        required=False,
+        allow_null=True
+    )
+    assistant_doctor_name = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_null=True,
+        allow_blank=True
+    )
     
     class Meta:
         model = SurgicalCase
@@ -174,11 +199,22 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
             'is_operated',
             'is_billed',
             'is_paid',
+            'assistant_doctor',
+            'assistant_doctor_name',
             'procedures',
             'created_at',
             'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Configurar queryset para assistant_doctor
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        if 'request' in self.context:
+            # Permitir seleccionar cualquier usuario como ayudante
+            self.fields['assistant_doctor'].queryset = User.objects.all()
     
     def validate_patient_name(self, value):
         """Validar que el nombre no esté vacío"""
@@ -187,7 +223,17 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
         return value.strip()
     
     def validate(self, data):
-        """Validaciones de lógica de negocio para estados"""
+        """Validaciones de lógica de negocio"""
+        # NUEVO: Validar que no se usen ambos campos de ayudante a la vez
+        assistant_doctor = data.get('assistant_doctor')
+        assistant_doctor_name = data.get('assistant_doctor_name')
+        
+        if assistant_doctor and assistant_doctor_name:
+            raise serializers.ValidationError({
+                'assistant_doctor_name': 'No puedes tener un colega registrado y un nombre manual al mismo tiempo'
+            })
+        
+        # Validaciones de estados
         is_operated = data.get('is_operated', getattr(self.instance, 'is_operated', False) if self.instance else False)
         is_billed = data.get('is_billed', getattr(self.instance, 'is_billed', False) if self.instance else False)
         is_paid = data.get('is_paid', getattr(self.instance, 'is_paid', False) if self.instance else False)
