@@ -1,13 +1,13 @@
-// src/components/cases/InvitationCard.tsx
+// src/pages/cases/InvitationCard.tsx
 
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Button } from '@/shared/components/ui/button';
+import { Badge } from '@/shared/components/ui/badge';
 import { Calendar, Clock, Hospital, User, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { surgicalCaseService } from '@/services/surgicalCaseService';
 import type { SurgicalCase } from '@/types/surgical-case';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/shared/hooks/useToast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -27,50 +27,39 @@ export function InvitationCard({ case: surgicalCase, onAccept, onReject }: Invit
       setIsAccepting(true);
       await surgicalCaseService.acceptInvitation(surgicalCase.id);
       
-      toast({
-        title: '¡Invitación aceptada!',
-        description: 'Ahora puedes ver los detalles de este caso quirúrgico.',
-        variant: 'default',
-      });
+      toast.success('¡Invitación aceptada!', 'Ahora puedes ver los detalles de este caso quirúrgico.');
 
       onAccept?.(surgicalCase.id);
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'No se pudo aceptar la invitación',
-        variant: 'destructive',
-      });
+      toast.error('Error', error.message || 'No se pudo aceptar la invitación');
     } finally {
       setIsAccepting(false);
     }
   };
 
   const handleReject = async () => {
-    try {
-      setIsRejecting(true);
-      await surgicalCaseService.rejectInvitation(surgicalCase.id);
-      
-      toast({
-        title: 'Invitación rechazada',
-        description: 'El médico principal será notificado.',
-        variant: 'default',
-      });
+  try {
+    setIsRejecting(true);
+    await surgicalCaseService.rejectInvitation(surgicalCase.id);
+    
+    toast.info('Invitación rechazada', 'El médico principal será notificado.');
 
-      onReject?.(surgicalCase.id);
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'No se pudo rechazar la invitación',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsRejecting(false);
+    // Llamar al callback para remover de la lista
+    if (onReject) {
+      onReject(surgicalCase.id);
     }
-  };
+  } catch (error: any) {
+    toast.error('Error', error.message || 'No se pudo rechazar la invitación');
+  } finally {
+    setIsRejecting(false);
+  }
+};
 
   const formattedDate = surgicalCase.surgery_date 
     ? format(new Date(surgicalCase.surgery_date), "d 'de' MMMM, yyyy", { locale: es })
     : 'Fecha no especificada';
+
+    const isRejected = surgicalCase.assistant_accepted === false;
 
   const formattedTime = surgicalCase.surgery_time 
     ? surgicalCase.surgery_time 
@@ -149,44 +138,54 @@ export function InvitationCard({ case: surgicalCase, onAccept, onReject }: Invit
       </CardContent>
 
       <CardFooter className="flex gap-2">
-        <Button
-          onClick={handleAccept}
-          disabled={isAccepting || isRejecting}
-          className="flex-1"
-          variant="default"
-        >
-          {isAccepting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Aceptando...
-            </>
-          ) : (
-            <>
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-              Aceptar invitación
-            </>
-          )}
-        </Button>
+  {isRejected ? (
+    <div className="w-full p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
+      <p className="text-sm text-center text-red-700 dark:text-red-300 font-medium">
+        ✗ Invitación rechazada - El médico principal puede reasignarte o elegir otro ayudante
+      </p>
+    </div>
+  ) : (
+    <>
+      <Button
+        onClick={handleAccept}
+        disabled={isAccepting || isRejecting}
+        className="flex-1"
+        variant="default"
+      >
+        {isAccepting ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Aceptando...
+          </>
+        ) : (
+          <>
+            <CheckCircle2 className="mr-2 h-4 w-4" />
+            Aceptar invitación
+          </>
+        )}
+      </Button>
 
-        <Button
-          onClick={handleReject}
-          disabled={isAccepting || isRejecting}
-          className="flex-1"
-          variant="outline"
-        >
-          {isRejecting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Rechazando...
-            </>
-          ) : (
-            <>
-              <XCircle className="mr-2 h-4 w-4" />
-              Rechazar
-            </>
-          )}
-        </Button>
-      </CardFooter>
+      <Button
+        onClick={handleReject}
+        disabled={isAccepting || isRejecting}
+        className="flex-1"
+        variant="outline"
+      >
+        {isRejecting ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Rechazando...
+          </>
+        ) : (
+          <>
+            <XCircle className="mr-2 h-4 w-4" />
+            Rechazar
+          </>
+        )}
+      </Button>
+    </>
+  )}
+</CardFooter>
     </Card>
   );
 }

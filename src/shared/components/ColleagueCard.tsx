@@ -35,19 +35,19 @@ export function ColleagueCard({ colleague, onRemove, isRemoving }: ColleagueCard
           )}
         </div>
 
-        {/* Nombre e info básica */}
+        {/* Nombre e info básica - ARREGLADO con break-words */}
         <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-semibold text-foreground truncate">
+          <h3 className="text-lg font-semibold text-foreground break-words">
             {colleague.full_name || colleague.username}
           </h3>
-          <p className="text-sm text-muted-foreground">@{colleague.username}</p>
+          <p className="text-sm text-muted-foreground break-all">@{colleague.username}</p>
         </div>
 
         {/* Botón eliminar */}
         <button
           onClick={() => onRemove(colleague.id)}
           disabled={isRemoving}
-          className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
+          className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0"
           title="Eliminar colega"
         >
           {isRemoving ? (
@@ -58,42 +58,42 @@ export function ColleagueCard({ colleague, onRemove, isRemoving }: ColleagueCard
         </button>
       </div>
 
-      {/* Detalles del colega */}
+      {/* Detalles del colega - ARREGLADO con break-words y overflow */}
       <div className="space-y-2 text-sm">
         {colleague.specialty && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Stethoscope className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate">{colleague.specialty}</span>
+          <div className="flex items-start gap-2 text-muted-foreground">
+            <Stethoscope className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span className="break-words flex-1">{colleague.specialty}</span>
           </div>
         )}
 
         {colleague.hospital_default && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Building2 className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate">{colleague.hospital_default}</span>
+          <div className="flex items-start gap-2 text-muted-foreground">
+            <Building2 className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span className="break-words flex-1">{colleague.hospital_default}</span>
           </div>
         )}
 
         {colleague.email && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Mail className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate">{colleague.email}</span>
+          <div className="flex items-start gap-2 text-muted-foreground">
+            <Mail className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span className="break-all flex-1">{colleague.email}</span>
           </div>
         )}
 
         {colleague.phone && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Phone className="w-4 h-4 flex-shrink-0" />
-            <span>{colleague.phone}</span>
+          <div className="flex items-start gap-2 text-muted-foreground">
+            <Phone className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span className="break-words flex-1">{colleague.phone}</span>
           </div>
         )}
       </div>
 
       {/* Código de amigo */}
       <div className="mt-4 pt-4 border-t">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Código de colega</span>
-          <code className="text-xs font-mono bg-muted px-2 py-1 rounded">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-muted-foreground flex-shrink-0">Código de colega</span>
+          <code className="text-xs font-mono bg-muted px-2 py-1 rounded break-all">
             {colleague.friend_code}
           </code>
         </div>

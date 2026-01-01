@@ -1,4 +1,5 @@
-//src/pages/cases/edit.tsx
+// src/pages/cases/edit.tsx
+
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppLayout } from '@/shared/components/layout/AppLayout';
@@ -133,22 +134,22 @@ const EditCase = () => {
     }
   };
 
-      // Load colleagues
-      useEffect(() => {
-        const loadColleagues = async () => {
-          try {
-            setLoadingColleagues(true);
-            const data = await colleaguesService.getColleagues();
-            setColleagues(data.colleagues);
-          } catch (error) {
-            console.error('Error loading colleagues:', error);
-          } finally {
-            setLoadingColleagues(false);
-          }
-        };
+  // Load colleagues
+  useEffect(() => {
+    const loadColleagues = async () => {
+      try {
+        setLoadingColleagues(true);
+        const data = await colleaguesService.getColleagues();
+        setColleagues(data.colleagues);
+      } catch (error) {
+        console.error('Error loading colleagues:', error);
+      } finally {
+        setLoadingColleagues(false);
+      }
+    };
 
-        loadColleagues();
-      }, []);
+    loadColleagues();
+  }, []);
 
   // Load hospitals and procedures
   useEffect(() => {
@@ -294,7 +295,6 @@ const EditCase = () => {
     setSearchQuery('');
     setShowProcedureSearch(false);
     
-    // Toast cuando se agrega un procedimiento
     toast.success(
       'Procedimiento agregado',
       `${procedure.cirugia} agregado exitosamente`
@@ -306,7 +306,6 @@ const EditCase = () => {
     const removedProc = selectedProcedures[index];
     setSelectedProcedures(selectedProcedures.filter((_, i) => i !== index));
     
-    // Toast cuando se elimina un procedimiento
     toast.info(
       'Procedimiento eliminado',
       `${removedProc.surgery_name} fue eliminado de la lista`
@@ -333,94 +332,131 @@ const EditCase = () => {
     return totalRvu * parseFloat(hospital.rate_multiplier?.toString() || '1');
   }, [totalRvu, hospitalId, hospitals]);
 
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validation
-    if (!patientName.trim()) {
-      toast.error(
-        'Error de validación',
-        'El nombre del paciente es requerido'
-      );
-      return;
-    }
-    
-    if (!hospitalId) {
-      toast.error(
-        'Error de validación',
-        'Por favor selecciona un hospital'
-      );
-      return;
-    }
-    
-    if (!surgeryDate) {
-      toast.error(
-        'Error de validación',
-        'La fecha de cirugía es requerida'
-      );
-      return;
-    }
-    
-    if (selectedProcedures.length === 0) {
-      toast.error(
-        'Error de validación',
-        'Por favor agrega al menos un procedimiento'
-      );
-      return;
-    }
+  // En src/pages/cases/edit.tsx
+// Reemplaza la función handleSubmit COMPLETA:
 
-    setSubmitting(true);
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  // Validation
+  if (!patientName.trim()) {
+    toast.error('Error de validación', 'El nombre del paciente es requerido');
+    return;
+  }
+  
+  if (!hospitalId) {
+    toast.error('Error de validación', 'Por favor selecciona un hospital');
+    return;
+  }
+  
+  if (!surgeryDate) {
+    toast.error('Error de validación', 'La fecha de cirugía es requerida');
+    return;
+  }
+  
+  if (selectedProcedures.length === 0) {
+    toast.error('Error de validación', 'Por favor agrega al menos un procedimiento');
+    return;
+  }
+
+  setSubmitting(true);
+  
+  try {
+    const hospital = hospitals.find(h => h.id === parseInt(hospitalId));
+    const hospitalFactor = hospital?.rate_multiplier || 1;
     
-    try {
-      const hospital = hospitals.find(h => h.id === parseInt(hospitalId));
-      const hospitalFactor = hospital?.rate_multiplier || 1;
-      
-      const caseData = {
-        patient_name: patientName,
-        patient_id: patientId || undefined,
-        patient_age: patientAge ? parseInt(patientAge) : undefined,
-        patient_gender: (patientGender || undefined) as PatientGender | undefined,
-        hospital: parseInt(hospitalId),
-        surgery_date: surgeryDate,
-        surgery_time: surgeryTime || undefined,
-        diagnosis: diagnosis || undefined,
-        notes: notes || undefined,
-        status: status || 'scheduled',
-        // Médico ayudante
-        assistant_doctor: assistantType === 'colleague' ? selectedColleagueId : null,
-        assistant_doctor_name: assistantType === 'manual' ? manualAssistantName : null,
-        procedures: selectedProcedures.map((proc, index) => ({
+    console.log('Sending case data:', {
+      patient_name: patientName,
+      hospital: parseInt(hospitalId),
+      surgery_date: surgeryDate,
+      procedures: selectedProcedures
+    });
+    
+    // Crear objeto con SOLO los campos necesarios
+    const caseData: any = {
+      patient_name: patientName,
+      hospital: parseInt(hospitalId),
+      surgery_date: surgeryDate,
+      status: status || 'scheduled',
+      // Limpiar procedimientos - REMOVER campos undefined/null
+      procedures: selectedProcedures.map((proc, index) => {
+        const cleanProc: any = {
           surgery_code: proc.surgery_code,
           surgery_name: proc.surgery_name,
           specialty: proc.specialty,
-          grupo: proc.grupo,
+          grupo: proc.grupo || '',
           rvu: proc.rvu,
           hospital_factor: hospitalFactor,
           calculated_value: proc.rvu * hospitalFactor,
-          notes: proc.notes || undefined,
-          procedure_order: index + 1  // Cambiado de 'order' a 'procedure_order'
-        }))
-      };
+          order: index
+        };
+        
+        // Solo agregar notes si tiene valor
+        if (proc.notes && proc.notes.trim()) {
+          cleanProc.notes = proc.notes.trim();
+        }
+        
+        return cleanProc;
+      })
+    };
 
-      await surgicalCaseService.updateCase(parseInt(id!), caseData);
-      
-      toast.success(
-        '¡Caso actualizado exitosamente!',
-        `El caso de ${patientName} ha sido actualizado correctamente con ${selectedProcedures.length} procedimiento${selectedProcedures.length !== 1 ? 's' : ''}`
-      );
-      
-      navigate(`/cases/${id}`);
-    } catch (error) {
-      console.error('Error updating case:', error);
-      toast.error(
-        'Error al actualizar caso',
-        'No se pudo actualizar el caso quirúrgico. Por favor intenta de nuevo.'
-      );
-    } finally {
-      setSubmitting(false);
+    // Agregar campos opcionales SOLO si tienen valor
+    if (patientId && patientId.trim()) {
+      caseData.patient_id = patientId.trim();
     }
-  };
+    
+    if (patientAge && patientAge.trim()) {
+      caseData.patient_age = parseInt(patientAge);
+    }
+    
+    if (patientGender) {
+      caseData.patient_gender = patientGender;
+    }
+    
+    if (surgeryTime && surgeryTime.trim()) {
+      caseData.surgery_time = surgeryTime;
+    }
+    
+    if (diagnosis && diagnosis.trim()) {
+      caseData.diagnosis = diagnosis.trim();
+    }
+    
+    if (notes && notes.trim()) {
+      caseData.notes = notes.trim();
+    }
+
+    // Manejar médico ayudante
+    if (assistantType === 'colleague' && selectedColleagueId) {
+      caseData.assistant_doctor = selectedColleagueId;
+    } else if (assistantType === 'manual' && manualAssistantName.trim()) {
+      caseData.assistant_doctor_name = manualAssistantName.trim();
+    }
+    // Si es 'none', no agregamos nada
+
+    console.log('Final caseData to send:', JSON.stringify(caseData, null, 2));
+
+    await surgicalCaseService.updateCase(parseInt(id!), caseData);
+    
+    toast.success(
+      '¡Caso actualizado exitosamente!',
+      `El caso de ${patientName} ha sido actualizado correctamente con ${selectedProcedures.length} procedimiento${selectedProcedures.length !== 1 ? 's' : ''}`
+    );
+    
+    navigate(`/cases/${id}`);
+  } catch (error: any) {
+    console.error('Error updating case:', error);
+    
+    let errorMessage = 'No se pudo actualizar el caso quirúrgico.';
+    
+    if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    toast.error('Error al actualizar caso', errorMessage);
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   if (loading) {
     return (
@@ -618,6 +654,10 @@ const EditCase = () => {
                   if (value === 'none') {
                     setSelectedColleagueId(null);
                     setManualAssistantName('');
+                  } else if (value === 'colleague') {
+                    setManualAssistantName('');
+                  } else if (value === 'manual') {
+                    setSelectedColleagueId(null);
                   }
                 }}>
                   <SelectTrigger id="assistantType">

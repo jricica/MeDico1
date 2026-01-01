@@ -312,8 +312,8 @@ const NewCase = () => {
         diagnosis: diagnosis || undefined,
         notes: notes || undefined,
         // Médico ayudante
-        assistant_doctor: assistantType === 'colleague' ? selectedColleagueId : null,
-        assistant_doctor_name: assistantType === 'manual' ? manualAssistantName : null,
+         assistant_doctor: assistantType === 'colleague' ? selectedColleagueId : undefined,
+        assistant_doctor_name: assistantType === 'manual' ? manualAssistantName : undefined,
         procedures: selectedProcedures.map((proc, index) => ({
           surgery_code: proc.surgery_code,
           surgery_name: proc.surgery_name,
@@ -326,6 +326,13 @@ const NewCase = () => {
           order: index + 1
         }))
       };
+      // Solo agregar campos de ayudante si hay uno seleccionado
+    if (assistantType === 'colleague' && selectedColleagueId) {
+      caseData.assistant_doctor = selectedColleagueId;
+      // NO enviar assistant_accepted - se establece como null en el backend
+    } else if (assistantType === 'manual' && manualAssistantName) {
+      caseData.assistant_doctor_name = manualAssistantName;
+    }
 
       await surgicalCaseService.createCase(caseData);
       

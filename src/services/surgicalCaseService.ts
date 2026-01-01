@@ -174,7 +174,9 @@ class SurgicalCaseService {
    */
   async updateCase(id: number, data: UpdateCaseData): Promise<SurgicalCase> {
     try {
-      console.log('Updating case with data:', data);
+      console.log('=== ACTUALIZANDO CASO ===');
+      console.log('ID:', id);
+      console.log('Data enviada:', JSON.stringify(data, null, 2));
       
       const response = await authService.authenticatedFetch(
         `${API_URL}/api/v1/medico/cases/${id}/`,
@@ -184,9 +186,55 @@ class SurgicalCaseService {
         }
       );
       
-      return await this.handleResponse<SurgicalCase>(response);
+      console.log('=== RESPUESTA DEL SERVIDOR ===');
+      console.log('Status:', response.status);
+      console.log('OK:', response.ok);
+      
+      // Si no es OK, intentar obtener el error
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type');
+        if (contentType?.includes('application/json')) {
+          const errorData = await response.json();
+          console.log('=== ERROR DATA ===');
+          console.log(errorData);
+          
+          // Formatear el mensaje de error
+          let errorMessage = 'Error al actualizar el caso';
+          if (typeof errorData === 'object') {
+            if (errorData.detail) {
+              errorMessage = errorData.detail;
+            } else if (errorData.error) {
+              errorMessage = errorData.error;
+            } else {
+              // Combinar todos los errores de campos
+              const fieldErrors = Object.entries(errorData)
+                .map(([field, messages]) => {
+                  if (Array.isArray(messages)) {
+                    return `${field}: ${messages.join(', ')}`;
+                  }
+                  return `${field}: ${messages}`;
+                })
+                .join('; ');
+              
+              if (fieldErrors) {
+                errorMessage = fieldErrors;
+              }
+            }
+          }
+          
+          throw new Error(errorMessage);
+        }
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log('=== CASO ACTUALIZADO ===');
+      console.log(result);
+      
+      return result;
     } catch (error: any) {
-      console.error('Error updating case:', error);
+      console.error('=== ERROR CAPTURADO ===');
+      console.error(error);
       throw error;
     }
   }

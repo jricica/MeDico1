@@ -106,10 +106,13 @@ class SurgicalCase(models.Model):
         help_text="Nombre manual del médico ayudante (si no es un colega registrado)"
     )
     assistant_accepted = models.BooleanField(
-        default=False,
+        default=None,
+        null=True,
+        blank=True,
         verbose_name="Ayudante Aceptó",
         help_text="Indica si el médico ayudante aceptó participar en este caso"
     )
+    
     assistant_notified_at = models.DateTimeField(
         blank=True,
         null=True,
@@ -193,7 +196,7 @@ class SurgicalCase(models.Model):
                 old_instance = SurgicalCase.objects.get(pk=self.pk)
                 # Si cambió el ayudante, resetear la aceptación
                 if old_instance.assistant_doctor != self.assistant_doctor:
-                    self.assistant_accepted = False
+                    self.assistant_accepted = None
                     # Si hay un nuevo ayudante, notificar
                     if self.assistant_doctor:
                         self.assistant_notified_at = timezone.now()
@@ -208,14 +211,40 @@ class SurgicalCase(models.Model):
         super().save(*args, **kwargs)
     
     def can_be_deleted(self):
-        """Solo se puede eliminar si está cobrado"""
-        return self.is_paid
-    
+        """
+        Un caso puede eliminarse si:
+        1. Está cobrado (is_paid = True), O
+        2. El ayudante rechazó (assistant_accepted = False), O
+        3. No tiene ayudante asignado
+        """
+        # Si está cobrado, siempre se puede eliminar
+        if self.is_paid:
+            return True
+        
+        # Si el ayudante rechazó, se puede eliminar
+        if self.assistant_accepted is False:
+            return True
+        
+        # Si no tiene ayudante, se puede eliminar
+        if not self.assistant_doctor and not self.assistant_doctor_name:
+            return True
+        
+        return False
+
+    def can_be_deleted_by(self, user):
+        """Verificar si un usuario específico puede eliminar este caso"""
+        if not self.can_be_deleted():
+            return False
+        
+        # Solo el creador puede eliminar
+        return self.created_by == user
+
     def delete(self, *args, **kwargs):
-        """Override delete para validar que esté cobrado"""
+        """Override delete para validar permisos"""
         if not self.can_be_deleted():
             raise ValidationError(
-                "No se puede eliminar una cirugía que no ha sido cobrada"
+                "No se puede eliminar este caso. El caso debe estar cobrado, "
+                "no tener ayudante asignado, o el ayudante debe haber rechazado la invitación."
             )
         super().delete(*args, **kwargs)
     

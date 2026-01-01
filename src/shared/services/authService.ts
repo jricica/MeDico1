@@ -26,7 +26,7 @@ export interface User {
   role: number;
   is_admin: boolean;
   plan: string;
-  friend_code: string; // ← AGREGADO
+  friend_code: string;
   name: string;
   phone?: string;
   specialty?: string;
@@ -330,7 +330,7 @@ class AuthService {
 
   /**
    * Realizar fetch con autenticación automática (incluye retry con refresh token)
-   * 🔧 FIXED: Detecta FormData y no agrega Content-Type para permitir subida de archivos
+   * 🔧 FIXED: Detecta FormData y maneja correctamente JSON strings
    */
   async authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
     const accessToken = this.getAccessToken();
@@ -345,16 +345,32 @@ class AuthService {
       ...(options.headers as Record<string, string>),
     };
 
+    // Preparar el body correctamente
+    let bodyToSend = options.body;
+
     // ⚠️ NO agregar Content-Type si el body es FormData
     // El navegador lo hace automáticamente con el boundary correcto
-    if (!(options.body instanceof FormData)) {
+    if (options.body instanceof FormData) {
+      // FormData - no hacer nada, dejar que el navegador maneje
+      // NO agregar Content-Type
+    } else if (options.body) {
+      // Si hay body y NO es FormData, asegurar que es JSON
       headers['Content-Type'] = 'application/json';
+      
+      // Si el body ya es string, usarlo directamente
+      // Si es un objeto, convertirlo a string
+      if (typeof options.body === 'string') {
+        bodyToSend = options.body;
+      } else {
+        bodyToSend = JSON.stringify(options.body);
+      }
     }
 
     // Intentar request con access token actual
     let response = await fetch(url, {
       ...options,
       headers,
+      body: bodyToSend,
     });
 
     // Si es 401, intentar refresh y reintentar
@@ -368,15 +384,21 @@ class AuthService {
           ...(options.headers as Record<string, string>),
         };
 
-        // ⚠️ NO agregar Content-Type si el body es FormData
-        if (!(options.body instanceof FormData)) {
+        // Preparar body para retry
+        let retryBody = options.body;
+        
+        if (options.body instanceof FormData) {
+          // FormData - no hacer nada
+        } else if (options.body) {
           retryHeaders['Content-Type'] = 'application/json';
+          retryBody = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
         }
         
         // Reintentar request con nuevo token
         response = await fetch(url, {
           ...options,
           headers: retryHeaders,
+          body: retryBody,
         });
       } catch (error) {
         this.clearAuth();

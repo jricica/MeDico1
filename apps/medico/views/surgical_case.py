@@ -4,6 +4,7 @@
 ViewSets para casos quirúrgicos
 """
 from django.db.models import Sum, Count, Q
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -146,25 +147,25 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
         return Response(detail_serializer.data)
     
     def destroy(self, request, *args, **kwargs):
-        """Eliminar caso (solo si está pagado y es el creador)"""
+        """Eliminar caso (validando permisos)"""
         instance = self.get_object()
         
         # Verificar permisos
-        if not instance.can_be_edited_by(request.user):
+        if not instance.can_be_deleted_by(request.user):
             return Response(
-                {'error': 'Solo el creador del caso puede eliminarlo'},
+                {'error': 'No tienes permiso para eliminar este caso'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # Verificar que esté pagado
-        if not instance.can_be_deleted():
+        # Intentar eliminar
+        try:
+            instance.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except DjangoValidationError as e:
             return Response(
-                {'error': 'Solo se pueden eliminar casos que ya han sido cobrados'},
+                {'error': str(e.message) if hasattr(e, 'message') else str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        instance.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
     
     @action(detail=False, methods=['get'], url_path='assisted')
     def get_assisted_cases(self, request):
@@ -179,7 +180,9 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
         ).prefetch_related('procedures')
         
         # Separar en pendientes y aceptados
-        pending_cases = cases.filter(assistant_accepted=False)
+        # Solo mostrar pendientes (null) y aceptados (true)
+        # Los rechazados (false) NO aparecen
+        pending_cases = cases.filter(assistant_accepted__isnull=True)
         accepted_cases = cases.filter(assistant_accepted=True)
         
         pending_serializer = SurgicalCaseListSerializer(
@@ -215,7 +218,7 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
             )
         
         # Verificar que no haya aceptado ya
-        if case.assistant_accepted:
+        if case.assistant_accepted is True:
             return Response(
                 {'message': 'Ya has aceptado esta invitación'},
                 status=status.HTTP_200_OK
@@ -235,7 +238,6 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
     def reject_invitation(self, request, pk=None):
         """
         Rechazar invitación como médico ayudante
-        (Esto simplemente marca como no aceptado, el creador puede reasignar)
         """
         case = self.get_object()
         
@@ -246,7 +248,7 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # Rechazar invitación (marcar como no aceptado)
+        # Rechazar invitación (marcar como false)
         case.assistant_accepted = False
         case.save()
         
@@ -336,7 +338,6 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
     def add_procedure(self, request, pk=None):
         """
         Agregar un procedimiento a un caso existente
-        Body: { "surgery_code": "...", "surgery_name": "...", ... }
         """
         case = self.get_object()
         
@@ -396,7 +397,6 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
     def update_status(self, request, pk=None):
         """
         Actualizar solo el estado de un caso
-        Body: { "status": "completed" }
         """
         case = self.get_object()
         
@@ -431,7 +431,7 @@ class SurgicalCaseViewSet(viewsets.ModelViewSet):
 
 class CaseProcedureViewSet(viewsets.ModelViewSet):
     """
-    ViewSet para gestionar procedimientos individuales (si se necesita acceso directo)
+    ViewSet para gestionar procedimientos individuales
     """
     serializer_class = CaseProcedureSerializer
     permission_classes = [IsAuthenticated]

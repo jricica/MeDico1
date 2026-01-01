@@ -6,6 +6,7 @@ Serializers para casos quirúrgicos y procedimientos
 from rest_framework import serializers
 from apps.medico.models import SurgicalCase, CaseProcedure
 from django.contrib.auth import get_user_model
+import copy
 
 User = get_user_model()
 
@@ -61,7 +62,7 @@ class SurgicalCaseListSerializer(serializers.ModelSerializer):
     
     # Campos de médico ayudante
     assistant_display_name = serializers.CharField(read_only=True)
-    assistant_accepted = serializers.BooleanField(read_only=True)
+    assistant_accepted = serializers.BooleanField(read_only=True, allow_null=True)
     
     # Permisos
     can_edit = serializers.SerializerMethodField()
@@ -134,7 +135,7 @@ class SurgicalCaseDetailSerializer(serializers.ModelSerializer):
     
     # Campos de médico ayudante
     assistant_display_name = serializers.CharField(read_only=True)
-    assistant_accepted = serializers.BooleanField(read_only=True)
+    assistant_accepted = serializers.BooleanField(read_only=True, allow_null=True)
     assistant_notified_at = serializers.DateTimeField(read_only=True)
     
     # Permisos
@@ -216,6 +217,11 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
         allow_null=True,
         allow_blank=True
     )
+    assistant_accepted = serializers.BooleanField(
+        required=False,
+        allow_null=True,
+        default=None
+    )
     
     class Meta:
         model = SurgicalCase
@@ -236,17 +242,47 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
             'is_paid',
             'assistant_doctor',
             'assistant_doctor_name',
+            'assistant_accepted',
             'procedures',
             'created_at',
             'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
     
+    def to_internal_value(self, data):
+        """Limpiar datos antes de validar - CRÍTICO PARA PROCEDURES"""
+        # Crear copia profunda para no modificar el original
+        cleaned_data = copy.deepcopy(data)
+        
+        # Limpiar assistant_doctor_name
+        if 'assistant_doctor_name' in cleaned_data:
+            if cleaned_data['assistant_doctor_name'] == '':
+                cleaned_data['assistant_doctor_name'] = None
+        
+        # IMPORTANTE: Verificar que procedures sea una lista válida
+        if 'procedures' in cleaned_data:
+            if not isinstance(cleaned_data['procedures'], list):
+                raise serializers.ValidationError({
+                    'procedures': 'Debe ser una lista de procedimientos'
+                })
+        
+        return super().to_internal_value(cleaned_data)
+    
     def validate_patient_name(self, value):
         """Validar que el nombre no esté vacío"""
         if not value or not value.strip():
             raise serializers.ValidationError("El nombre del paciente es requerido")
         return value.strip()
+    
+    def validate_procedures(self, value):
+        """Validar que procedures sea una lista válida"""
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Debe ser una lista de procedimientos")
+        
+        if len(value) == 0:
+            raise serializers.ValidationError("Debe haber al menos un procedimiento")
+        
+        return value
     
     def validate(self, data):
         """Validaciones de lógica de negocio"""
@@ -259,18 +295,27 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
                 'assistant_doctor_name': 'No puedes tener un colega registrado y un nombre manual al mismo tiempo'
             })
         
+        # Si se está cambiando el assistant_doctor
+        if 'assistant_doctor' in data:
+            if data['assistant_doctor'] is None:
+                data['assistant_accepted'] = None
+            elif not self.instance or (self.instance and self.instance.assistant_doctor != data['assistant_doctor']):
+                data['assistant_accepted'] = None
+        
+        # Si se está limpiando assistant_doctor_name
+        if 'assistant_doctor_name' in data and not data['assistant_doctor_name']:
+            data['assistant_doctor_name'] = None
+        
         # Validaciones de estados
         is_operated = data.get('is_operated', getattr(self.instance, 'is_operated', False) if self.instance else False)
         is_billed = data.get('is_billed', getattr(self.instance, 'is_billed', False) if self.instance else False)
         is_paid = data.get('is_paid', getattr(self.instance, 'is_paid', False) if self.instance else False)
         
-        # No se puede facturar sin operar
         if is_billed and not is_operated:
             raise serializers.ValidationError({
                 'is_billed': 'No se puede marcar como facturado sin estar operado'
             })
         
-        # No se puede cobrar sin facturar
         if is_paid and not is_billed:
             raise serializers.ValidationError({
                 'is_paid': 'No se puede marcar como cobrado sin estar facturado'
@@ -282,10 +327,11 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
         """Crear caso con procedimientos anidados"""
         procedures_data = validated_data.pop('procedures', [])
         
-        # Crear el caso
+        if 'assistant_accepted' not in validated_data or validated_data['assistant_accepted'] is None:
+            validated_data['assistant_accepted'] = None
+        
         case = SurgicalCase.objects.create(**validated_data)
         
-        # Crear los procedimientos
         for index, proc_data in enumerate(procedures_data):
             if 'order' not in proc_data:
                 proc_data['order'] = index
@@ -303,19 +349,21 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
         # Actualizar campos del caso
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        
         instance.save()
         
         # Si se enviaron procedimientos, reemplazar todos
         if procedures_data is not None:
-            # Eliminar procedimientos existentes
             instance.procedures.all().delete()
             
-            # Crear nuevos procedimientos
-            for order, proc_data in enumerate(procedures_data):
+            # CAMBIO AQUÍ: usar 'idx' en lugar de 'order' para evitar conflicto
+            for idx, proc_data in enumerate(procedures_data):
+                # Asegurar que el procedimiento tenga un orden
+                proc_data['order'] = idx
+                
                 CaseProcedure.objects.create(
                     case=instance,
-                    order=order,
-                    **proc_data
+                    **proc_data  # Ahora 'order' viene dentro de proc_data
                 )
         
         return instance

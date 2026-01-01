@@ -16,7 +16,8 @@ import { notificationService } from "@/services/notificationService";
 import { advertisementService, type ActiveAd } from "@/admin/services/advertisementService";
 import { useToast } from "@/shared/hooks/useToast";
 import { ReadOnlyBadge } from "@/pages/cases/ReadOnlyBadge";
-import type { SurgicalCase } from "@/types/surgical-case";
+import { InvitationCard } from "@/pages/cases/InvitationCard";
+import type { SurgicalCase, AssistedCasesResponse } from "@/types/surgical-case";
 import { Link } from "react-router-dom";
 import { Loader2, Check } from 'lucide-react';
 import {
@@ -34,7 +35,8 @@ import {
   Loader2 as LoaderIcon,
   Lock,
   UserCheck,
-  Users
+  Users,
+  Bell
 } from "lucide-react";
 
 // Componente CaseStatusToggles inline
@@ -171,6 +173,15 @@ const CasesPage = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
+  // Estado para invitaciones
+  const [invitations, setInvitations] = useState<AssistedCasesResponse>({
+    pending_invitations: [],
+    accepted_cases: [],
+    total_pending: 0,
+    total_accepted: 0,
+  });
+  const [loadingInvitations, setLoadingInvitations] = useState(true);
+
   const [sidebarAds, setSidebarAds] = useState<ActiveAd[]>([]);
   const [betweenContentAds, setBetweenContentAds] = useState<ActiveAd[]>([]);
   const [loadingAds, setLoadingAds] = useState(true);
@@ -178,6 +189,7 @@ const CasesPage = () => {
 
   useEffect(() => {
     fetchCases();
+    fetchInvitations();
     loadAds();
   }, []);
 
@@ -188,6 +200,42 @@ const CasesPage = () => {
     }, 10000);
     return () => clearInterval(interval);
   }, [sidebarAds.length]);
+
+  const fetchInvitations = async () => {
+    try {
+      setLoadingInvitations(true);
+      const data = await surgicalCaseService.getAssistedCases();
+      setInvitations(data);
+    } catch (err: any) {
+      console.error('Error fetching invitations:', err);
+    } finally {
+      setLoadingInvitations(false);
+    }
+  };
+
+  const handleInvitationAccepted = (caseId: number) => {
+    const acceptedCase = invitations.pending_invitations.find(c => c.id === caseId);
+    if (acceptedCase) {
+      setInvitations({
+        pending_invitations: invitations.pending_invitations.filter(c => c.id !== caseId),
+        accepted_cases: [...invitations.accepted_cases, { ...acceptedCase, assistant_accepted: true }],
+        total_pending: invitations.total_pending - 1,
+        total_accepted: invitations.total_accepted + 1,
+      });
+      // Refrescar casos
+      fetchCases();
+      toast.success('Invitación aceptada', 'El caso ahora aparece en tu lista');
+    }
+  };
+
+  const handleInvitationRejected = (caseId: number) => {
+    setInvitations({
+      ...invitations,
+      pending_invitations: invitations.pending_invitations.filter(c => c.id !== caseId),
+      total_pending: invitations.total_pending - 1,
+    });
+    toast.info('Invitación rechazada', 'El médico principal será notificado');
+  };
 
   const loadAds = async () => {
     try {
@@ -448,21 +496,47 @@ const CasesPage = () => {
                 {filteredCases.length} de {cases.length} caso{cases.length !== 1 ? 's' : ''}
               </p>
             </div>
-            <div className="flex gap-2 w-full sm:w-auto">
-              <Button asChild variant="outline" className="flex-1 sm:flex-none">
-                <Link to="/cases/invitations">
-                  <UserCheck className="w-4 h-4 mr-2" />
-                  Invitaciones
-                </Link>
-              </Button>
-              <Button asChild className="flex-1 sm:flex-none">
-                <Link to="/cases/new">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nuevo Caso
-                </Link>
-              </Button>
-            </div>
+            <Button asChild className="w-full sm:w-auto">
+              <Link to="/cases/new">
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Caso
+              </Link>
+            </Button>
           </div>
+
+          {/* SECCIÓN DE INVITACIONES PENDIENTES */}
+          {!loadingInvitations && invitations.total_pending > 0 && (
+            <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/20">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Bell className="w-5 h-5 text-orange-600" />
+                    <CardTitle className="text-lg">
+                      Invitaciones Pendientes
+                    </CardTitle>
+                    <Badge variant="destructive">
+                      {invitations.total_pending}
+                    </Badge>
+                  </div>
+                </div>
+                <CardDescription>
+                  Tienes {invitations.total_pending} invitación{invitations.total_pending !== 1 ? 'es' : ''} para colaborar como médico ayudante
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {invitations.pending_invitations.map((invitation) => (
+                    <InvitationCard
+                      key={invitation.id}
+                      case={invitation}
+                      onAccept={handleInvitationAccepted}
+                      onReject={handleInvitationRejected}
+                    />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {cases.length > 0 && (
             <div className="flex flex-col gap-4">
@@ -572,13 +646,38 @@ const CasesPage = () => {
                             <span className="truncate">{surgicalCase.hospital_name}</span>
                           </div>
                           {!isOwner && surgicalCase.created_by_name && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <div className="p-1.5 bg-orange-500/10 rounded-lg">
-                                <Users className="w-4 h-4 text-orange-500" />
-                              </div>
-                              <span className="text-xs">Creado por: {surgicalCase.created_by_name}</span>
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="p-1.5 bg-orange-500/10 rounded-lg">
+                              <Users className="w-4 h-4 text-orange-500" />
                             </div>
-                          )}
+                            <span className="text-xs">Creado por: {surgicalCase.created_by_name}</span>
+                          </div>
+                        )}
+                        
+                        {/* Mostrar estado del ayudante si soy el dueño */}
+                        {isOwner && surgicalCase.assistant_display_name && surgicalCase.assistant_display_name !== "Sin ayudante" && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="p-1.5 bg-teal-500/10 rounded-lg">
+                              <Users className="w-4 h-4 text-teal-500" />
+                            </div>
+                            <div className="flex items-center gap-2 flex-1">
+                              <span className="text-xs truncate">Ayudante: {surgicalCase.assistant_display_name}</span>
+                              {surgicalCase.assistant_accepted === true ? (
+                                <Badge variant="default" className="bg-green-600 text-white text-xs">
+                                  ✓ Aceptó
+                                </Badge>
+                              ) : surgicalCase.assistant_accepted === false ? (
+                                <Badge variant="destructive" className="bg-red-600 text-white text-xs">
+                                  ✗ Rechazó
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="bg-yellow-600 text-white text-xs">
+                                  ⏳ Pendiente
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        )}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-3">
@@ -591,22 +690,38 @@ const CasesPage = () => {
                           />
                         )}
 
-                        <div className="grid grid-cols-3 gap-2 text-center pt-2 border-t">
-                          <div>
-                            <div className="text-xs text-muted-foreground mb-1">Procedimientos</div>
-                            <div className="text-lg font-semibold">{surgicalCase.procedure_count || 0}</div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-muted-foreground mb-1">RVU Total</div>
-                            <div className="text-lg font-semibold">{surgicalCase.total_rvu || 0}</div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-muted-foreground mb-1">Valor</div>
-                            <div className="text-lg font-semibold">
-                              ${(surgicalCase.total_value || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                       {/* Mostrar valores según si es dueño o ayudante */}
+                        {isOwner ? (
+                          // Vista completa para el dueño (con valor monetario)
+                          <div className="grid grid-cols-3 gap-2 text-center pt-2 border-t">
+                            <div>
+                              <div className="text-xs text-muted-foreground mb-1">Procedimientos</div>
+                              <div className="text-lg font-semibold">{surgicalCase.procedure_count || 0}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground mb-1">RVU Total</div>
+                              <div className="text-lg font-semibold">{surgicalCase.total_rvu || 0}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground mb-1">Valor</div>
+                              <div className="text-lg font-semibold">
+                                ${(surgicalCase.total_value || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        ) : (
+                          // Vista simplificada para el ayudante (sin valor monetario)
+                          <div className="grid grid-cols-2 gap-2 text-center pt-2 border-t">
+                            <div>
+                              <div className="text-xs text-muted-foreground mb-1">Procedimientos</div>
+                              <div className="text-lg font-semibold">{surgicalCase.procedure_count || 0}</div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground mb-1">RVU Total</div>
+                              <div className="text-lg font-semibold">{surgicalCase.total_rvu || 0}</div>
+                            </div>
+                          </div>
+                        )}
 
                         {surgicalCase.primary_specialty && (
                           <div className="text-center py-2 border-t">
@@ -699,4 +814,3 @@ const CasesPage = () => {
 };
 
 export default CasesPage;
-          

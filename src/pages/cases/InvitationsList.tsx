@@ -1,15 +1,16 @@
 // src/components/cases/InvitationsList.tsx
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { Button } from '@/shared/components/ui/button';
-import { Badge } from '@/shared/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { surgicalCaseService } from '@/services/surgicalCaseService';
 import { InvitationCard } from '@/pages/cases/InvitationCard';
 import type { SurgicalCase, AssistedCasesResponse } from '@/types/surgical-case';
 import { Loader2, UserCheck, Clock, Briefcase, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Button } from '@/shared/components/ui/button';
+import { Badge } from '@/shared/components/ui/badge';
+
 
 export function InvitationsList() {
   const [loading, setLoading] = useState(true);
