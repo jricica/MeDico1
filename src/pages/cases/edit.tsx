@@ -55,6 +55,7 @@ const EditCase = () => {
   const [hospitalId, setHospitalId] = useState('');
   const [surgeryDate, setSurgeryDate] = useState('');
   const [surgeryTime, setSurgeryTime] = useState('');
+  const [surgeryEndTime, setSurgeryEndTime] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState<'scheduled' | 'completed' | 'billed' | 'paid' | 'cancelled'>('scheduled');
@@ -97,6 +98,7 @@ const EditCase = () => {
       setHospitalId(caseData.hospital?.toString() || '');
       setSurgeryDate(caseData.surgery_date);
       setSurgeryTime(caseData.surgery_time || '');
+      setSurgeryEndTime(caseData.surgery_end_time || '');
       setDiagnosis(caseData.diagnosis || '');
       setNotes(caseData.notes || '');
       setStatus(caseData.status || 'scheduled');
@@ -416,7 +418,9 @@ const handleSubmit = async (e: React.FormEvent) => {
     if (surgeryTime && surgeryTime.trim()) {
       caseData.surgery_time = surgeryTime;
     }
-    
+    if (surgeryEndTime && surgeryEndTime.trim()) {
+      caseData.surgery_end_time = surgeryEndTime;
+    }
     if (diagnosis && diagnosis.trim()) {
       caseData.diagnosis = diagnosis.trim();
     }
@@ -606,6 +610,15 @@ const handleSubmit = async (e: React.FormEvent) => {
                     type="time"
                     value={surgeryTime}
                     onChange={(e) => setSurgeryTime(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="surgeryEndTime">Hora de Fin (estimada)</Label>
+                  <Input
+                    id="surgeryEndTime"
+                    type="time"
+                    value={surgeryEndTime}
+                    onChange={(e) => setSurgeryEndTime(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">

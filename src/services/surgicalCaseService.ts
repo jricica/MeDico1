@@ -1,6 +1,7 @@
 // src/services/surgicalCaseService.ts
 
 import { authService } from '@/shared/services/authService';
+import { calendarSyncService } from './calendarSyncService';
 import type { 
   SurgicalCase, 
   CreateCaseData, 

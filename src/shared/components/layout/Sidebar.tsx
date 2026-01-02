@@ -7,8 +7,9 @@ import {
   Stethoscope, 
   Building2,
   Briefcase,
-  Users,  // ← Nuevo icono para Colleagues
-  LogOut
+  Users,  
+  LogOut,
+  CalendarIcon
 } from "lucide-react";
 
 import {
@@ -45,10 +46,16 @@ const items = [
     icon: Building2,
   },
   {
-    title: "Colleagues",  // ← Nuevo item
+    title: "Colleagues",  
     url: "/colleagues",
     icon: Users,
   },
+
+  {
+  title: "Calendar",
+  url: "/calendar",
+  icon: CalendarIcon, // ya tienes este icono importado
+},
   {
     title: "Calculator",
     url: "/calculator",

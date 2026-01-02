@@ -74,6 +74,9 @@ class SurgicalCaseListSerializer(serializers.ModelSerializer):
             'id',
             'patient_name',
             'surgery_date',
+            'surgery_time',
+            'surgery_end_time',
+            'calendar_event_id',
             'hospital',
             'hospital_name',
             'status',
@@ -94,7 +97,7 @@ class SurgicalCaseListSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'calendar_event_id', 'created_at', 'updated_at']
     
     def get_can_edit(self, obj):
         """Verificar si el usuario actual puede editar"""
@@ -155,6 +158,8 @@ class SurgicalCaseDetailSerializer(serializers.ModelSerializer):
             'hospital_rate_multiplier',
             'surgery_date',
             'surgery_time',
+            'surgery_end_time',
+            'calendar_event_id',
             'status',
             'status_display',
             'is_operated',
@@ -178,7 +183,7 @@ class SurgicalCaseDetailSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_by', 'calendar_event_id', 'created_at', 'updated_at']
     
     def get_can_edit(self, obj):
         """Verificar si el usuario actual puede editar"""
@@ -234,6 +239,8 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
             'hospital',
             'surgery_date',
             'surgery_time',
+            'surgery_end_time',
+            'calendar_event_id',
             'status',
             'notes',
             'diagnosis',
@@ -247,19 +254,16 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'calendar_event_id', 'created_at', 'updated_at']
     
     def to_internal_value(self, data):
-        """Limpiar datos antes de validar - CRÍTICO PARA PROCEDURES"""
-        # Crear copia profunda para no modificar el original
+        """Limpiar datos antes de validar"""
         cleaned_data = copy.deepcopy(data)
         
-        # Limpiar assistant_doctor_name
         if 'assistant_doctor_name' in cleaned_data:
             if cleaned_data['assistant_doctor_name'] == '':
                 cleaned_data['assistant_doctor_name'] = None
         
-        # IMPORTANTE: Verificar que procedures sea una lista válida
         if 'procedures' in cleaned_data:
             if not isinstance(cleaned_data['procedures'], list):
                 raise serializers.ValidationError({
@@ -286,7 +290,6 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
     
     def validate(self, data):
         """Validaciones de lógica de negocio"""
-        # Validar que no se usen ambos campos de ayudante a la vez
         assistant_doctor = data.get('assistant_doctor')
         assistant_doctor_name = data.get('assistant_doctor_name')
         
@@ -295,18 +298,15 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
                 'assistant_doctor_name': 'No puedes tener un colega registrado y un nombre manual al mismo tiempo'
             })
         
-        # Si se está cambiando el assistant_doctor
         if 'assistant_doctor' in data:
             if data['assistant_doctor'] is None:
                 data['assistant_accepted'] = None
             elif not self.instance or (self.instance and self.instance.assistant_doctor != data['assistant_doctor']):
                 data['assistant_accepted'] = None
         
-        # Si se está limpiando assistant_doctor_name
         if 'assistant_doctor_name' in data and not data['assistant_doctor_name']:
             data['assistant_doctor_name'] = None
         
-        # Validaciones de estados
         is_operated = data.get('is_operated', getattr(self.instance, 'is_operated', False) if self.instance else False)
         is_billed = data.get('is_billed', getattr(self.instance, 'is_billed', False) if self.instance else False)
         is_paid = data.get('is_paid', getattr(self.instance, 'is_paid', False) if self.instance else False)
@@ -346,24 +346,20 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
         """Actualizar caso y sus procedimientos"""
         procedures_data = validated_data.pop('procedures', None)
         
-        # Actualizar campos del caso
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         
         instance.save()
         
-        # Si se enviaron procedimientos, reemplazar todos
         if procedures_data is not None:
             instance.procedures.all().delete()
             
-            # CAMBIO AQUÍ: usar 'idx' en lugar de 'order' para evitar conflicto
             for idx, proc_data in enumerate(procedures_data):
-                # Asegurar que el procedimiento tenga un orden
                 proc_data['order'] = idx
                 
                 CaseProcedure.objects.create(
                     case=instance,
-                    **proc_data  # Ahora 'order' viene dentro de proc_data
+                    **proc_data
                 )
         
         return instance

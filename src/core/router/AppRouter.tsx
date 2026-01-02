@@ -29,7 +29,8 @@ import Favorites from "@/pages/favorites";
 import HistoryPage from "@/pages/history";
 import SettingsPage from "@/pages/settings";
 import DebugFavorites from "@/pages/debug-favorites";
-import ColleaguesPage from "@/pages/ColleaguesPage"; // ← AGREGADO
+import ColleaguesPage from "@/pages/ColleaguesPage"; 
+import CalendarPage from "@/pages/calendar";
 
 export const AppRouter = () => {
   return (
@@ -65,10 +66,11 @@ export const AppRouter = () => {
       <Route path='/operations' element={<ProtectedRoute><Operations /></ProtectedRoute>} />
       <Route path='/hospitals' element={<ProtectedRoute><HospitalsPage /></ProtectedRoute>} />
       <Route path='/favorites' element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
-      <Route path='/colleagues' element={<ProtectedRoute><ColleaguesPage /></ProtectedRoute>} /> {/* ← AGREGADO */}
+      <Route path='/colleagues' element={<ProtectedRoute><ColleaguesPage /></ProtectedRoute>} /> 
       <Route path='/history' element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
       <Route path='/settings' element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       <Route path='/debug-favorites' element={<ProtectedRoute><DebugFavorites /></ProtectedRoute>} />
+      <Route path='/calendar' element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
     </Routes>
   );
 };

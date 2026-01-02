@@ -53,6 +53,8 @@ export interface SurgicalCase {
   hospital_rate_multiplier?: number;
   surgery_date: string;
   surgery_time?: string;
+  surgery_end_time?: string;        // ✅ NUEVO
+  calendar_event_id?: string;       // ✅ NUEVO
   diagnosis?: string;
   notes?: string;
   status: CaseStatus;
@@ -93,6 +95,7 @@ export interface CreateCaseData {
   hospital: number;
   surgery_date: string;
   surgery_time?: string;
+  surgery_end_time?: string;       // ✅ NUEVO
   diagnosis?: string;
   notes?: string;
   procedures: Omit<Procedure, 'id'>[];

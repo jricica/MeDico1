@@ -52,6 +52,7 @@ const NewCase = () => {
   const [hospitalId, setHospitalId] = useState('');
   const [surgeryDate, setSurgeryDate] = useState('');
   const [surgeryTime, setSurgeryTime] = useState('');
+  const [surgeryEndTime, setSurgeryEndTime] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [notes, setNotes] = useState('');
   
@@ -309,6 +310,7 @@ const NewCase = () => {
         hospital: parseInt(hospitalId),
         surgery_date: surgeryDate,
         surgery_time: surgeryTime || undefined,
+        surgery_end_time: surgeryEndTime || undefined,
         diagnosis: diagnosis || undefined,
         notes: notes || undefined,
         // Médico ayudante
@@ -506,6 +508,16 @@ const NewCase = () => {
                     onChange={(e) => setSurgeryTime(e.target.value)}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="surgeryEndTime">Hora de Fin (estimada)</Label>
+                <Input
+                  id="surgeryEndTime"
+                  type="time"
+                  value={surgeryEndTime}
+                  onChange={(e) => setSurgeryEndTime(e.target.value)}
+                />
               </div>
             </CardContent>
           </Card>

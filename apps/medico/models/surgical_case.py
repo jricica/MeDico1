@@ -62,7 +62,19 @@ class SurgicalCase(models.Model):
     surgery_time = models.TimeField(
         blank=True,
         null=True,
-        verbose_name="Hora de Cirugía"
+        verbose_name="Hora de Inicio de Cirugía"
+    )
+    surgery_end_time = models.TimeField(
+        blank=True,
+        null=True,
+        verbose_name="Hora de Fin de Cirugía"
+    )
+    calendar_event_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name="ID del Evento en Google Calendar",
+        help_text="ID del evento sincronizado con Google Calendar"
     )
     status = models.CharField(
         max_length=20,
@@ -161,6 +173,7 @@ class SurgicalCase(models.Model):
             models.Index(fields=['is_billed']),
             models.Index(fields=['is_paid']),
             models.Index(fields=['assistant_doctor']),
+            models.Index(fields=['calendar_event_id']),
         ]
     
     def __str__(self):
