@@ -5,8 +5,20 @@ import { AppLayout } from "@/shared/components/layout/AppLayout";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Badge } from "@/shared/components/ui/badge";
-import { Alert, AlertDescription } from "@/shared/components/ui/alert";
+import { Input } from "@/shared/components/ui/input";
+import { Label } from "@/shared/components/ui/label";
+import { Textarea } from "@/shared/components/ui/textarea";
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
 import { useGoogleCalendar } from "@/shared/hooks/useGoogleCalendar";
+import { googleCalendarService, type CalendarEvent } from "@/services/googleCalendarService";
+import { useToast } from "@/shared/hooks/useToast";
 import { 
   Calendar as CalendarIcon, 
   ChevronLeft, 
@@ -17,9 +29,10 @@ import {
   MapPin,
   Users,
   CheckCircle2,
-  XCircle
+  Plus,
+  RefreshCw,
+  Trash2
 } from "lucide-react";
-import type { CalendarEvent } from "@/services/googleCalendarService";
 
 const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const MONTHS = [
@@ -35,6 +48,7 @@ interface CalendarDay {
 }
 
 const CalendarPage = () => {
+  const { toast } = useToast();
   const {
     isConnected,
     userEmail,
@@ -48,6 +62,18 @@ const CalendarPage = () => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(null);
   const [loadingEvents, setLoadingEvents] = useState(false);
+  
+  // Create event dialog
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newEvent, setNewEvent] = useState({
+    title: '',
+    date: '',
+    startTime: '',
+    endTime: '',
+    location: '',
+    description: ''
+  });
 
   useEffect(() => {
     if (isConnected) {
@@ -66,9 +92,12 @@ const CalendarPage = () => {
       const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
       
       const fetchedEvents = await getEvents(startOfMonth, endOfMonth);
+      console.log('📅 Eventos cargados:', fetchedEvents.length);
+      console.log('Eventos:', fetchedEvents);
       setEvents(fetchedEvents);
     } catch (error) {
       console.error('Error loading events:', error);
+      toast.error('Error', 'No se pudieron cargar los eventos');
     } finally {
       setLoadingEvents(false);
     }
@@ -141,6 +170,76 @@ const CalendarPage = () => {
 
   const goToToday = () => {
     setCurrentDate(new Date());
+  };
+
+  const handleCreateEvent = async () => {
+    if (!newEvent.title || !newEvent.date || !newEvent.startTime || !newEvent.endTime) {
+      toast.error('Error', 'Por favor completa todos los campos obligatorios');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const startDateTime = new Date(`${newEvent.date}T${newEvent.startTime}`).toISOString();
+      const endDateTime = new Date(`${newEvent.date}T${newEvent.endTime}`).toISOString();
+
+      const event: CalendarEvent = {
+        summary: newEvent.title,
+        description: newEvent.description || undefined,
+        location: newEvent.location || undefined,
+        start: {
+          dateTime: startDateTime,
+          timeZone: 'America/Guatemala',
+        },
+        end: {
+          dateTime: endDateTime,
+          timeZone: 'America/Guatemala',
+        },
+        reminders: {
+          useDefault: false,
+          overrides: [
+            { method: 'popup', minutes: 30 },
+          ],
+        },
+      };
+
+      await googleCalendarService.createEvent(event);
+      
+      toast.success('¡Evento creado!', 'El evento se agregó a tu calendario');
+      
+      // Limpiar formulario y cerrar
+      setNewEvent({
+        title: '',
+        date: '',
+        startTime: '',
+        endTime: '',
+        location: '',
+        description: ''
+      });
+      setShowCreateDialog(false);
+      
+      // Recargar eventos
+      await loadMonthEvents();
+    } catch (error) {
+      console.error('Error creating event:', error);
+      toast.error('Error', 'No se pudo crear el evento');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDeleteEvent = async (eventId: string, eventTitle: string) => {
+    const confirmed = confirm(`¿Eliminar el evento "${eventTitle}"?`);
+    if (!confirmed) return;
+
+    try {
+      await googleCalendarService.deleteEvent(eventId);
+      toast.success('Evento eliminado', 'El evento se eliminó correctamente');
+      await loadMonthEvents();
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      toast.error('Error', 'No se pudo eliminar el evento');
+    }
   };
 
   const formatTime = (dateTimeStr: string) => {
@@ -219,10 +318,16 @@ const CalendarPage = () => {
                 Conectado como <strong>{userEmail}</strong>
               </p>
             </div>
-            <Badge className="gap-1" variant="default">
-              <CalendarIcon className="w-3 h-3" />
-              Google Calendar
-            </Badge>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={loadMonthEvents} disabled={loadingEvents}>
+                <RefreshCw className={`w-4 h-4 mr-2 ${loadingEvents ? 'animate-spin' : ''}`} />
+                Actualizar
+              </Button>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Evento
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -345,7 +450,19 @@ const CalendarPage = () => {
                 selectedDay.events.map((event, index) => (
                   <Card key={index} className="border-l-4 border-l-primary">
                     <CardContent className="p-4 space-y-2">
-                      <h4 className="font-semibold">{event.summary}</h4>
+                      <div className="flex items-start justify-between">
+                        <h4 className="font-semibold flex-1">{event.summary}</h4>
+                        {event.id && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 hover:text-destructive"
+                            onClick={() => handleDeleteEvent(event.id!, event.summary)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                       
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Clock className="w-4 h-4" />
@@ -384,6 +501,99 @@ const CalendarPage = () => {
           </Card>
         </div>
       </div>
+
+      {/* Create Event Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Crear Nuevo Evento</DialogTitle>
+            <DialogDescription>
+              Agrega un evento a tu Google Calendar
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Título *</Label>
+              <Input
+                id="title"
+                value={newEvent.title}
+                onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                placeholder="Ej: Reunión con el equipo"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="date">Fecha *</Label>
+              <Input
+                id="date"
+                type="date"
+                value={newEvent.date}
+                onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="startTime">Hora Inicio *</Label>
+                <Input
+                  id="startTime"
+                  type="time"
+                  value={newEvent.startTime}
+                  onChange={(e) => setNewEvent({ ...newEvent, startTime: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="endTime">Hora Fin *</Label>
+                <Input
+                  id="endTime"
+                  type="time"
+                  value={newEvent.endTime}
+                  onChange={(e) => setNewEvent({ ...newEvent, endTime: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="location">Ubicación</Label>
+              <Input
+                id="location"
+                value={newEvent.location}
+                onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+                placeholder="Ej: Sala de reuniones"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Descripción</Label>
+              <Textarea
+                id="description"
+                value={newEvent.description}
+                onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                placeholder="Detalles adicionales..."
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={creating}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateEvent} disabled={creating}>
+              {creating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creando...
+                </>
+              ) : (
+                'Crear Evento'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 };

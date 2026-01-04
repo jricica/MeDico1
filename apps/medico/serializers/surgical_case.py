@@ -54,6 +54,8 @@ class SurgicalCaseListSerializer(serializers.ModelSerializer):
     procedure_count = serializers.IntegerField(read_only=True)
     primary_specialty = serializers.CharField(read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    
     
     # Campos de estado
     is_operated = serializers.BooleanField(default=False)
@@ -96,8 +98,9 @@ class SurgicalCaseListSerializer(serializers.ModelSerializer):
             'is_owner',
             'created_at',
             'updated_at',
+            'created_by_name',
         ]
-        read_only_fields = ['id', 'calendar_event_id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_can_edit(self, obj):
         """Verificar si el usuario actual puede editar"""
@@ -183,7 +186,7 @@ class SurgicalCaseDetailSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'created_by', 'calendar_event_id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
     
     def get_can_edit(self, obj):
         """Verificar si el usuario actual puede editar"""
@@ -209,6 +212,14 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
     is_operated = serializers.BooleanField(default=False, required=False)
     is_billed = serializers.BooleanField(default=False, required=False)
     is_paid = serializers.BooleanField(default=False, required=False)
+    
+    # ✅ calendar_event_id ahora es writable (no en read_only)
+    calendar_event_id = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_null=True,
+        allow_blank=True
+    )
     
     # Campos de médico ayudante (opcionales)
     assistant_doctor = serializers.PrimaryKeyRelatedField(
@@ -240,7 +251,7 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
             'surgery_date',
             'surgery_time',
             'surgery_end_time',
-            'calendar_event_id',
+            'calendar_event_id',  # ✅ Ahora es writable
             'status',
             'notes',
             'diagnosis',
@@ -254,7 +265,7 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'calendar_event_id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']  # ✅ calendar_event_id REMOVIDO
     
     def to_internal_value(self, data):
         """Limpiar datos antes de validar"""
@@ -263,6 +274,11 @@ class SurgicalCaseCreateUpdateSerializer(serializers.ModelSerializer):
         if 'assistant_doctor_name' in cleaned_data:
             if cleaned_data['assistant_doctor_name'] == '':
                 cleaned_data['assistant_doctor_name'] = None
+        
+        # ✅ Limpiar calendar_event_id vacío
+        if 'calendar_event_id' in cleaned_data:
+            if cleaned_data['calendar_event_id'] == '':
+                cleaned_data['calendar_event_id'] = None
         
         if 'procedures' in cleaned_data:
             if not isinstance(cleaned_data['procedures'], list):

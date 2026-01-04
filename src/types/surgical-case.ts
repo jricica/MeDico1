@@ -53,12 +53,14 @@ export interface SurgicalCase {
   hospital_rate_multiplier?: number;
   surgery_date: string;
   surgery_time?: string;
-  surgery_end_time?: string;        // ✅ NUEVO
-  calendar_event_id?: string;       // ✅ NUEVO
+  surgery_end_time?: string;       
+  calendar_event_id?: string;       
   diagnosis?: string;
   notes?: string;
   status: CaseStatus;
   status_display?: string;
+  
+  
   
   // Campos de estado
   is_operated?: boolean;
@@ -95,10 +97,11 @@ export interface CreateCaseData {
   hospital: number;
   surgery_date: string;
   surgery_time?: string;
-  surgery_end_time?: string;       // ✅ NUEVO
+  surgery_end_time?: string;       
   diagnosis?: string;
   notes?: string;
   procedures: Omit<Procedure, 'id'>[];
+  
   
   // Campos de estado
   is_operated?: boolean;
@@ -115,6 +118,8 @@ export interface UpdateCaseData extends Partial<CreateCaseData> {
   is_operated?: boolean;
   is_billed?: boolean;
   is_paid?: boolean;
+  calendar_event_id?: string | null;
+  
 }
 
 // Tipos para respuestas de invitaciones

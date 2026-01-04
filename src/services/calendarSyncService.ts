@@ -6,6 +6,7 @@ import type { SurgicalCase } from '@/types/surgical-case';
 class CalendarSyncService {
   /**
    * Crear evento en Google Calendar para un caso quirúrgico
+   * Retorna el eventId si fue exitoso, null si falló
    */
   async createEventForCase(surgicalCase: SurgicalCase): Promise<string | null> {
     // Verificar si está conectado
@@ -62,16 +63,18 @@ class CalendarSyncService {
 
   /**
    * Actualizar evento existente en Google Calendar
+   * Si no existe calendar_event_id, NO crea uno nuevo (eso debe hacerse explícitamente)
    */
   async updateEventForCase(surgicalCase: SurgicalCase): Promise<boolean> {
     if (!googleCalendarService.isConnected()) {
+      console.log('⚠️ Google Calendar no está conectado');
       return false;
     }
 
+    // ✅ IMPORTANTE: Si no tiene calendar_event_id, NO actualizar (evita crear duplicados)
     if (!surgicalCase.calendar_event_id) {
-      // Si no tiene evento, crear uno nuevo
-      const eventId = await this.createEventForCase(surgicalCase);
-      return eventId !== null;
+      console.log('⚠️ Caso sin calendar_event_id, no se puede actualizar. Usa createEventForCase en su lugar.');
+      return false;
     }
 
     try {
@@ -108,7 +111,7 @@ class CalendarSyncService {
       };
 
       await googleCalendarService.updateEvent(surgicalCase.calendar_event_id, event);
-      console.log('✅ Evento actualizado en Google Calendar');
+      console.log('✅ Evento actualizado en Google Calendar:', surgicalCase.calendar_event_id);
       return true;
     } catch (error) {
       console.error('❌ Error al actualizar evento en Google Calendar:', error);

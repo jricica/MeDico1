@@ -21,7 +21,6 @@ class SurgicalCaseService {
   private async handleResponse<T>(response: Response): Promise<T> {
     const contentType = response.headers.get('content-type');
     
-    // Si la respuesta no es JSON, probablemente es un error HTML
     if (!contentType || !contentType.includes('application/json')) {
       const text = await response.text();
       console.error('Non-JSON response received:', {
@@ -38,7 +37,6 @@ class SurgicalCaseService {
       );
     }
 
-    // Si hay un error HTTP, intenta parsear el JSON de error
     if (!response.ok) {
       try {
         const errorData = await response.json();
@@ -53,9 +51,6 @@ class SurgicalCaseService {
 
   // ==================== CASOS PROPIOS ====================
 
-  /**
-   * Get all surgical cases
-   */
   async getCases(params?: {
     status?: string;
     hospital?: number;
@@ -83,9 +78,6 @@ class SurgicalCaseService {
     }
   }
 
-  /**
-   * Get a single surgical case by ID
-   */
   async getCase(id: number): Promise<SurgicalCase> {
     try {
       const response = await authService.authenticatedFetch(
@@ -98,9 +90,6 @@ class SurgicalCaseService {
     }
   }
 
-  /**
-   * Get statistics for the dashboard
-   */
   async getStats(): Promise<CaseStats> {
     try {
       const response = await authService.authenticatedFetch(
@@ -150,6 +139,7 @@ class SurgicalCaseService {
 
   /**
    * Create a new surgical case
+   * ✅ CON SINCRONIZACIÓN DE GOOGLE CALENDAR
    */
   async createCase(data: CreateCaseData): Promise<SurgicalCase> {
     try {
@@ -163,7 +153,29 @@ class SurgicalCaseService {
         }
       );
       
-      return await this.handleResponse<SurgicalCase>(response);
+      const surgicalCase = await this.handleResponse<SurgicalCase>(response);
+      console.log('🔍 Caso creado, calendar_event_id:', surgicalCase.calendar_event_id);
+
+      // ✅ SINCRONIZAR CON GOOGLE CALENDAR
+      try {
+        const eventId = await calendarSyncService.createEventForCase(surgicalCase);
+        
+        if (eventId) {
+          // ✅ IMPORTANTE: Usar skipCalendarSync=true para evitar crear duplicados
+          const updatedCase = await this.updateCase(surgicalCase.id, { 
+            calendar_event_id: eventId 
+          } as UpdateCaseData, true);
+          
+          console.log('🔍 Caso después de guardar eventId, calendar_event_id:', updatedCase.calendar_event_id);
+          console.log('✅ Caso creado y sincronizado con Google Calendar');
+          return updatedCase;
+        }
+      } catch (calendarError) {
+        console.error('⚠️ Error sincronizando con Google Calendar (caso creado exitosamente):', calendarError);
+        // No lanzar error - el caso ya fue creado exitosamente
+      }
+
+      return surgicalCase;
     } catch (error: any) {
       console.error('Error creating case:', error);
       throw error;
@@ -172,18 +184,51 @@ class SurgicalCaseService {
 
   /**
    * Update a surgical case
+   * ✅ CON SINCRONIZACIÓN DE GOOGLE CALENDAR (sin duplicados)
+   * ✅ CON NORMALIZACIÓN DE DATOS NUMÉRICOS
    */
-  async updateCase(id: number, data: UpdateCaseData): Promise<SurgicalCase> {
+  async updateCase(id: number, data: UpdateCaseData, skipCalendarSync: boolean = false): Promise<SurgicalCase> {
     try {
       console.log('=== ACTUALIZANDO CASO ===');
       console.log('ID:', id);
       console.log('Data enviada:', JSON.stringify(data, null, 2));
+      console.log('skipCalendarSync:', skipCalendarSync);
+      
+      // ✅ LIMPIAR Y NORMALIZAR DATOS DE PROCEDIMIENTOS
+      const cleanedData = { ...data };
+      if (cleanedData.procedures && Array.isArray(cleanedData.procedures)) {
+        cleanedData.procedures = cleanedData.procedures.map((proc: any) => {
+          // Convertir valores a números
+          const hospitalFactor = typeof proc.hospital_factor === 'string' 
+            ? parseFloat(proc.hospital_factor) 
+            : proc.hospital_factor;
+          
+          const calculatedValue = typeof proc.calculated_value === 'string'
+            ? parseFloat(proc.calculated_value)
+            : proc.calculated_value;
+          
+          const rvu = typeof proc.rvu === 'string'
+            ? parseFloat(proc.rvu)
+            : proc.rvu;
+          
+          return {
+            ...proc,
+            hospital_factor: hospitalFactor,
+            // ✅ REDONDEAR calculated_value a 2 decimales para cumplir con max_digits=12
+            calculated_value: Math.round(calculatedValue * 100) / 100,
+            rvu: rvu
+          };
+        });
+      }
+      
+      console.log('=== DATA LIMPIADA ===');
+      console.log(JSON.stringify(cleanedData, null, 2));
       
       const response = await authService.authenticatedFetch(
         `${API_URL}/api/v1/medico/cases/${id}/`,
         {
           method: 'PATCH',
-          body: JSON.stringify(data),
+          body: JSON.stringify(cleanedData),
         }
       );
       
@@ -191,23 +236,39 @@ class SurgicalCaseService {
       console.log('Status:', response.status);
       console.log('OK:', response.ok);
       
-      // Si no es OK, intentar obtener el error
       if (!response.ok) {
         const contentType = response.headers.get('content-type');
         if (contentType?.includes('application/json')) {
           const errorData = await response.json();
           console.log('=== ERROR DATA ===');
           console.log(errorData);
+          console.log('=== ERROR DATA STRINGIFIED ===');
+          console.log(JSON.stringify(errorData, null, 2));
           
-          // Formatear el mensaje de error
           let errorMessage = 'Error al actualizar el caso';
           if (typeof errorData === 'object') {
             if (errorData.detail) {
               errorMessage = errorData.detail;
             } else if (errorData.error) {
               errorMessage = errorData.error;
+            } else if (errorData.procedures) {
+              // Error específico en procedures
+              console.log('=== PROCEDURES ERROR ===');
+              console.log('Type:', typeof errorData.procedures);
+              console.log('Is Array:', Array.isArray(errorData.procedures));
+              console.log('Content:', errorData.procedures);
+              
+              if (Array.isArray(errorData.procedures)) {
+                errorMessage = `Error en procedimientos: ${errorData.procedures.map((err: any, idx: number) => {
+                  if (typeof err === 'object') {
+                    return `Procedimiento ${idx + 1}: ${JSON.stringify(err)}`;
+                  }
+                  return `Procedimiento ${idx + 1}: ${err}`;
+                }).join('; ')}`;
+              } else {
+                errorMessage = `Error en procedimientos: ${JSON.stringify(errorData.procedures)}`;
+              }
             } else {
-              // Combinar todos los errores de campos
               const fieldErrors = Object.entries(errorData)
                 .map(([field, messages]) => {
                   if (Array.isArray(messages)) {
@@ -228,11 +289,55 @@ class SurgicalCaseService {
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
       
-      const result = await response.json();
+      const surgicalCase = await response.json();
       console.log('=== CASO ACTUALIZADO ===');
-      console.log(result);
+      console.log(surgicalCase);
+      console.log('calendar_event_id en response:', surgicalCase.calendar_event_id);
+
+      // ✅ SINCRONIZAR CON GOOGLE CALENDAR - SOLO SI NO SE SALTEA
+      if (!skipCalendarSync) {
+        const hasRelevantChanges = !!(
+          data.patient_name || 
+          data.surgery_date || 
+          data.surgery_time || 
+          data.surgery_end_time || 
+          data.hospital || 
+          data.diagnosis ||
+          data.procedures
+        );
+
+        if (hasRelevantChanges) {
+          try {
+            // Si tiene calendar_event_id, actualizar; si no, crear uno nuevo
+            if (surgicalCase.calendar_event_id) {
+              const success = await calendarSyncService.updateEventForCase(surgicalCase);
+              if (success) {
+                console.log('✅ Evento actualizado en Google Calendar');
+              }
+            } else {
+              // No tiene calendar_event_id, crear uno nuevo
+              console.log('⚠️ Caso sin calendar_event_id, creando evento...');
+              const eventId = await calendarSyncService.createEventForCase(surgicalCase);
+              
+              if (eventId) {
+                // ✅ IMPORTANTE: Usar skipCalendarSync=true para evitar recursión
+                const updatedCase = await this.updateCase(surgicalCase.id, { 
+                  calendar_event_id: eventId 
+                } as UpdateCaseData, true);
+                
+                // ✅ CRÍTICO: Actualizar el objeto local con el eventId
+                surgicalCase.calendar_event_id = eventId;
+                
+                console.log('✅ Evento creado y vinculado en Google Calendar');
+              }
+            }
+          } catch (calendarError) {
+            console.error('⚠️ Error sincronizando con Google Calendar:', calendarError);
+          }
+        }
+      }
       
-      return result;
+      return surgicalCase;
     } catch (error: any) {
       console.error('=== ERROR CAPTURADO ===');
       console.error(error);
@@ -242,9 +347,22 @@ class SurgicalCaseService {
 
   /**
    * Delete a surgical case
+   * ✅ CON ELIMINACIÓN DE GOOGLE CALENDAR
    */
   async deleteCase(id: number): Promise<void> {
     try {
+      // ✅ OBTENER EL CASO PARA ELIMINAR EL EVENTO DE CALENDAR
+      try {
+        const surgicalCase = await this.getCase(id);
+        if (surgicalCase.calendar_event_id) {
+          await calendarSyncService.deleteEventForCase(surgicalCase.calendar_event_id);
+          console.log('✅ Evento eliminado de Google Calendar');
+        }
+      } catch (calendarError) {
+        console.error('⚠️ Error eliminando evento de Google Calendar:', calendarError);
+        // Continuar con la eliminación del caso de todos modos
+      }
+
       const response = await authService.authenticatedFetch(
         `${API_URL}/api/v1/medico/cases/${id}/`,
         {
@@ -260,15 +378,14 @@ class SurgicalCaseService {
         }
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
+
+      console.log('✅ Caso eliminado exitosamente');
     } catch (error: any) {
       console.error('Error deleting case:', error);
       throw error;
     }
   }
 
-  /**
-   * Actualizar solo el estado de un caso
-   */
   async updateStatus(id: number, status: string): Promise<SurgicalCase> {
     try {
       const response = await authService.authenticatedFetch(
@@ -287,9 +404,6 @@ class SurgicalCaseService {
 
   // ==================== PROCEDIMIENTOS ====================
 
-  /**
-   * Agregar un procedimiento a un caso existente
-   */
   async addProcedure(caseId: number, procedure: Omit<Procedure, 'id'>): Promise<Procedure> {
     try {
       const response = await authService.authenticatedFetch(
@@ -306,9 +420,6 @@ class SurgicalCaseService {
     }
   }
 
-  /**
-   * Eliminar un procedimiento de un caso
-   */
   async removeProcedure(caseId: number, procedureId: number): Promise<void> {
     try {
       const response = await authService.authenticatedFetch(
@@ -334,10 +445,6 @@ class SurgicalCaseService {
 
   // ==================== CASOS ASISTIDOS ====================
 
-  /**
-   * Obtener casos donde el usuario es ayudante
-   * Separa en invitaciones pendientes y casos aceptados
-   */
   async getAssistedCases(): Promise<AssistedCasesResponse> {
     try {
       const response = await authService.authenticatedFetch(
@@ -351,7 +458,8 @@ class SurgicalCaseService {
   }
 
   /**
-   * Aceptar una invitación como médico ayudante
+   * Accept invitation to assist in a case
+   * ✅ CON SINCRONIZACIÓN AUTOMÁTICA A GOOGLE CALENDAR
    */
   async acceptInvitation(caseId: number): Promise<InvitationResponse> {
     try {
@@ -361,7 +469,25 @@ class SurgicalCaseService {
           method: 'POST',
         }
       );
-      return await this.handleResponse<InvitationResponse>(response);
+      const result = await this.handleResponse<InvitationResponse>(response);
+
+      // ✅ AGREGAR AUTOMÁTICAMENTE AL CALENDARIO DEL AYUDANTE
+      try {
+        // Obtener el caso completo para sincronizarlo
+        const surgicalCase = await this.getCase(caseId);
+        
+        // Crear evento en el calendario del ayudante
+        const eventId = await calendarSyncService.createEventForCase(surgicalCase);
+        
+        if (eventId) {
+          console.log('✅ Invitación aceptada y agregada a Google Calendar del ayudante');
+        }
+      } catch (calendarError) {
+        console.error('⚠️ Error sincronizando con Google Calendar (invitación aceptada exitosamente):', calendarError);
+        // No lanzar error - la invitación ya fue aceptada
+      }
+
+      return result;
     } catch (error: any) {
       console.error('Error accepting invitation:', error);
       throw error;
@@ -369,7 +495,7 @@ class SurgicalCaseService {
   }
 
   /**
-   * Rechazar una invitación como médico ayudante
+   * Reject invitation to assist in a case
    */
   async rejectInvitation(caseId: number): Promise<InvitationResponse> {
     try {
@@ -388,32 +514,20 @@ class SurgicalCaseService {
 
   // ==================== ESTADOS DE PROCESO ====================
 
-  /**
-   * Marcar cirugía como operada
-   */
   async toggleOperated(id: number, isOperated: boolean): Promise<SurgicalCase> {
     return this.updateCase(id, { is_operated: isOperated });
   }
 
-  /**
-   * Marcar cirugía como facturada
-   */
   async toggleBilled(id: number, isBilled: boolean): Promise<SurgicalCase> {
     return this.updateCase(id, { is_billed: isBilled });
   }
 
-  /**
-   * Marcar cirugía como cobrada
-   */
   async togglePaid(id: number, isPaid: boolean): Promise<SurgicalCase> {
     return this.updateCase(id, { is_paid: isPaid });
   }
 
   // ==================== UTILIDADES ====================
 
-  /**
-   * Verificar si una cirugía puede ser eliminada
-   */
   canDelete(surgicalCase: SurgicalCase): { allowed: boolean; reason?: string } {
     if (!surgicalCase.is_paid) {
       return {
@@ -424,30 +538,18 @@ class SurgicalCaseService {
     return { allowed: true };
   }
 
-  /**
-   * Verificar si el usuario puede editar un caso
-   */
   canEdit(surgicalCase: SurgicalCase): boolean {
     return surgicalCase.can_edit ?? false;
   }
 
-  /**
-   * Verificar si el usuario es el dueño de un caso
-   */
   isOwner(surgicalCase: SurgicalCase): boolean {
     return surgicalCase.is_owner ?? false;
   }
 
-  /**
-   * Verificar si el caso tiene invitación pendiente
-   */
   hasPendingInvitation(surgicalCase: SurgicalCase): boolean {
     return !!(surgicalCase.assistant_doctor && !surgicalCase.assistant_accepted);
   }
 
-  /**
-   * Verificar si el caso está aceptado por el ayudante
-   */
   isAcceptedByAssistant(surgicalCase: SurgicalCase): boolean {
     return !!(surgicalCase.assistant_doctor && surgicalCase.assistant_accepted);
   }

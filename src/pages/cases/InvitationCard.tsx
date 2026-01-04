@@ -1,191 +1,132 @@
 // src/pages/cases/InvitationCard.tsx
 
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { Button } from '@/shared/components/ui/button';
-import { Badge } from '@/shared/components/ui/badge';
-import { Calendar, Clock, Hospital, User, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
-import { surgicalCaseService } from '@/services/surgicalCaseService';
-import type { SurgicalCase } from '@/types/surgical-case';
-import { useToast } from '@/shared/hooks/useToast';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
+import { Button } from "@/shared/components/ui/button";
+import { Badge } from "@/shared/components/ui/badge";
+import { Calendar, Hospital, Users, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { surgicalCaseService } from "@/services/surgicalCaseService";
+import { useToast } from "@/shared/hooks/useToast";
+import type { SurgicalCase } from "@/types/surgical-case";
 
 interface InvitationCardProps {
   case: SurgicalCase;
-  onAccept?: (caseId: number) => void;
-  onReject?: (caseId: number) => void;
+  onAccept: (caseId: number) => void;
+  onReject: (caseId: number) => void;
 }
 
 export function InvitationCard({ case: surgicalCase, onAccept, onReject }: InvitationCardProps) {
-  const [isAccepting, setIsAccepting] = useState(false);
-  const [isRejecting, setIsRejecting] = useState(false);
   const { toast } = useToast();
+  const [accepting, setAccepting] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
 
   const handleAccept = async () => {
+    setAccepting(true);
     try {
-      setIsAccepting(true);
       await surgicalCaseService.acceptInvitation(surgicalCase.id);
-      
-      toast.success('¡Invitación aceptada!', 'Ahora puedes ver los detalles de este caso quirúrgico.');
-
-      onAccept?.(surgicalCase.id);
+      toast.success('¡Invitación aceptada!', 'El caso ahora aparece en tu lista');
+      onAccept(surgicalCase.id);
     } catch (error: any) {
       toast.error('Error', error.message || 'No se pudo aceptar la invitación');
     } finally {
-      setIsAccepting(false);
+      setAccepting(false);
     }
   };
 
   const handleReject = async () => {
-  try {
-    setIsRejecting(true);
-    await surgicalCaseService.rejectInvitation(surgicalCase.id);
-    
-    toast.info('Invitación rechazada', 'El médico principal será notificado.');
+    const confirmed = confirm('¿Estás seguro de rechazar esta invitación?');
+    if (!confirmed) return;
 
-    // Llamar al callback para remover de la lista
-    if (onReject) {
+    setRejecting(true);
+    try {
+      await surgicalCaseService.rejectInvitation(surgicalCase.id);
+      toast.info('Invitación rechazada', 'El médico principal será notificado');
       onReject(surgicalCase.id);
+    } catch (error: any) {
+      toast.error('Error', error.message || 'No se pudo rechazar la invitación');
+    } finally {
+      setRejecting(false);
     }
-  } catch (error: any) {
-    toast.error('Error', error.message || 'No se pudo rechazar la invitación');
-  } finally {
-    setIsRejecting(false);
-  }
-};
-
-  const formattedDate = surgicalCase.surgery_date 
-    ? format(new Date(surgicalCase.surgery_date), "d 'de' MMMM, yyyy", { locale: es })
-    : 'Fecha no especificada';
-
-    const isRejected = surgicalCase.assistant_accepted === false;
-
-  const formattedTime = surgicalCase.surgery_time 
-    ? surgicalCase.surgery_time 
-    : 'Hora no especificada';
+  };
 
   return (
-    <Card className="w-full hover:shadow-lg transition-shadow">
-      <CardHeader>
+    <Card className="border-orange-300 hover:border-orange-400 transition-colors bg-white dark:bg-slate-900">
+      <CardHeader className="pb-3">
+        {/* ✅ NUEVO: Mostrar quién invitó */}
+        {surgicalCase.created_by_name && (
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 bg-blue-500/10 rounded-lg">
+              <Users className="w-3.5 h-3.5 text-blue-500" />
+            </div>
+            <span className="text-xs font-medium text-muted-foreground">
+              De: <span className="text-blue-600 dark:text-blue-400 font-semibold">{surgicalCase.created_by_name}</span>
+            </span>
+          </div>
+        )}
+        
         <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <CardTitle className="text-xl flex items-center gap-2">
-              {surgicalCase.patient_name}
-              <Badge variant="secondary" className="ml-2">
-                Invitación pendiente
-              </Badge>
-            </CardTitle>
-            <CardDescription className="mt-2">
-              Invitado por: <span className="font-medium">{surgicalCase.created_by_name || 'Colega'}</span>
-            </CardDescription>
-          </div>
+          <CardTitle className="text-base">{surgicalCase.patient_name}</CardTitle>
+          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-300">
+            Pendiente
+          </Badge>
         </div>
+        <CardDescription className="space-y-2 mt-2">
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar className="w-4 h-4 text-muted-foreground" />
+            <span>{new Date(surgicalCase.surgery_date).toLocaleDateString('es-ES', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            })}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <Hospital className="w-4 h-4 text-muted-foreground" />
+            <span>{surgicalCase.hospital_name}</span>
+          </div>
+        </CardDescription>
       </CardHeader>
-
-      <CardContent className="space-y-3">
-        {/* Fecha y hora */}
-        <div className="flex items-center gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span>{formattedDate}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span>{formattedTime}</span>
-          </div>
-        </div>
-
-        {/* Hospital */}
-        <div className="flex items-center gap-2 text-sm">
-          <Hospital className="h-4 w-4 text-muted-foreground" />
-          <span>{surgicalCase.hospital_name || 'Hospital no especificado'}</span>
-        </div>
-
-        {/* Información del paciente */}
-        {surgicalCase.patient_age && (
-          <div className="flex items-center gap-2 text-sm">
-            <User className="h-4 w-4 text-muted-foreground" />
-            <span>{surgicalCase.patient_age} años</span>
-            {surgicalCase.patient_gender && (
-              <Badge variant="outline" className="ml-2">
-                {surgicalCase.patient_gender === 'M' ? 'Masculino' : 
-                 surgicalCase.patient_gender === 'F' ? 'Femenino' : 'Otro'}
-              </Badge>
+      <CardContent>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleAccept}
+            disabled={accepting || rejecting}
+            className="flex-1 bg-green-600 hover:bg-green-700"
+            size="sm"
+          >
+            {accepting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                Aceptando...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="w-4 h-4 mr-1.5" />
+                Aceptar
+              </>
             )}
-          </div>
-        )}
-
-        {/* Especialidad y procedimientos */}
-        {surgicalCase.primary_specialty && (
-          <div className="flex items-center gap-2 text-sm">
-            <Badge variant="outline">{surgicalCase.primary_specialty}</Badge>
-            {surgicalCase.procedure_count && surgicalCase.procedure_count > 1 && (
-              <span className="text-muted-foreground">
-                + {surgicalCase.procedure_count - 1} más
-              </span>
+          </Button>
+          <Button
+            onClick={handleReject}
+            disabled={accepting || rejecting}
+            variant="outline"
+            className="flex-1 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+            size="sm"
+          >
+            {rejecting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                Rechazando...
+              </>
+            ) : (
+              <>
+                <XCircle className="w-4 h-4 mr-1.5" />
+                Rechazar
+              </>
             )}
-          </div>
-        )}
-
-        {/* Diagnóstico (si existe) */}
-        {surgicalCase.diagnosis && (
-          <div className="mt-3 p-3 bg-muted rounded-md text-sm">
-            <p className="font-medium mb-1">Diagnóstico:</p>
-            <p className="text-muted-foreground">{surgicalCase.diagnosis}</p>
-          </div>
-        )}
+          </Button>
+        </div>
       </CardContent>
-
-      <CardFooter className="flex gap-2">
-  {isRejected ? (
-    <div className="w-full p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
-      <p className="text-sm text-center text-red-700 dark:text-red-300 font-medium">
-        ✗ Invitación rechazada - El médico principal puede reasignarte o elegir otro ayudante
-      </p>
-    </div>
-  ) : (
-    <>
-      <Button
-        onClick={handleAccept}
-        disabled={isAccepting || isRejecting}
-        className="flex-1"
-        variant="default"
-      >
-        {isAccepting ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Aceptando...
-          </>
-        ) : (
-          <>
-            <CheckCircle2 className="mr-2 h-4 w-4" />
-            Aceptar invitación
-          </>
-        )}
-      </Button>
-
-      <Button
-        onClick={handleReject}
-        disabled={isAccepting || isRejecting}
-        className="flex-1"
-        variant="outline"
-      >
-        {isRejecting ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Rechazando...
-          </>
-        ) : (
-          <>
-            <XCircle className="mr-2 h-4 w-4" />
-            Rechazar
-          </>
-        )}
-      </Button>
-    </>
-  )}
-</CardFooter>
     </Card>
   );
 }

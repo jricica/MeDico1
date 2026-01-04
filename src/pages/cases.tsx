@@ -650,7 +650,9 @@ const CasesPage = () => {
                             <div className="p-1.5 bg-orange-500/10 rounded-lg">
                               <Users className="w-4 h-4 text-orange-500" />
                             </div>
-                            <span className="text-xs">Creado por: {surgicalCase.created_by_name}</span>
+                             <span className="text-xs">
+                              De: <span className="font-semibold text-blue-600 dark:text-blue-400">{surgicalCase.created_by_name}</span>
+                            </span>
                           </div>
                         )}
                         
