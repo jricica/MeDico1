@@ -1,6 +1,6 @@
 // src/pages/calendar.tsx
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppLayout } from "@/shared/components/layout/AppLayout";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
@@ -62,6 +62,7 @@ const CalendarPage = () => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(null);
   const [loadingEvents, setLoadingEvents] = useState(false);
+  const detailsPanelRef = useRef<HTMLDivElement>(null);
   
   // Create event dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -170,6 +171,18 @@ const CalendarPage = () => {
 
   const goToToday = () => {
     setCurrentDate(new Date());
+  };
+
+  const handleDayClick = (day: CalendarDay) => {
+    setSelectedDay(day);
+    
+    // Scroll al panel de detalles en móvil
+    setTimeout(() => {
+      detailsPanelRef.current?.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+    }, 100);
   };
 
   const handleCreateEvent = async () => {
@@ -373,7 +386,7 @@ const CalendarPage = () => {
                     {calendarDays.map((day, index) => (
                       <button
                         key={index}
-                        onClick={() => setSelectedDay(day)}
+                        onClick={() => handleDayClick(day)}
                         className={`
                           relative min-h-[80px] p-2 rounded-lg border text-left transition-all
                           ${day.isCurrentMonth 
@@ -423,7 +436,7 @@ const CalendarPage = () => {
           </Card>
 
           {/* Panel de detalles */}
-          <Card className="lg:col-span-1">
+          <Card className="lg:col-span-1" ref={detailsPanelRef}>
             <CardHeader>
               <CardTitle>
                 {selectedDay 

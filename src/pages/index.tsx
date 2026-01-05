@@ -2,6 +2,7 @@
 
 import { AppLayout } from "@/shared/components/layout/AppLayout";
 import { EmailVerificationBanner } from "@/shared/components/EmailVerificationBanner";
+import { WeekCalendarWidget } from "@/shared/components/ui/WeekCalendarWidget";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { useAuth } from "@/shared/contexts/AuthContext";
@@ -138,7 +139,7 @@ const Index = () => {
             </CardHeader>
             <CardContent>
               <div className="relative">
-                {/* Imagen del Anuncio - FIXED: Se adapta al tamaño de la imagen */}
+                {/* Imagen del Anuncio */}
                 <div 
                   className="relative bg-gray-900 rounded-lg overflow-hidden cursor-pointer group"
                   onClick={() => currentAd && handleAdClick(currentAd)}
@@ -171,7 +172,6 @@ const Index = () => {
                 {/* Controles del Carrusel */}
                 {goldAds.length > 1 && (
                   <>
-                    {/* Botones Anterior/Siguiente */}
                     <button
                       onClick={goToPrevious}
                       className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg transition-all"
@@ -188,7 +188,6 @@ const Index = () => {
                       <ChevronRight className="h-5 w-5 text-gray-800" />
                     </button>
 
-                    {/* Indicadores de Punto */}
                     <div className="flex justify-center gap-2 mt-4">
                       {goldAds.map((_, index) => (
                         <button
@@ -204,7 +203,6 @@ const Index = () => {
                       ))}
                     </div>
 
-                    {/* Info de Auto-play */}
                     <div className="flex justify-center mt-3">
                       <button
                         onClick={() => setIsAutoPlaying(!isAutoPlaying)}
@@ -220,7 +218,7 @@ const Index = () => {
           </Card>
         ) : null}
 
-        {/* Minimal Hero Section */}
+        {/* Hero Section */}
         <div className="pb-6 border-b">
           <h1 className="text-3xl font-semibold mb-1 tracking-tight">
             Welcome back, {user?.name || user?.full_name || "Doctor"}
@@ -230,7 +228,10 @@ const Index = () => {
           </p>
         </div>
 
-        {/* Minimal Stats Grid */}
+        {/* ✅ WIDGET DE CALENDARIO SEMANAL */}
+        <WeekCalendarWidget />
+
+        {/* Stats Grid */}
         <div className="grid gap-4 md:grid-cols-2">
           <div className="p-4 border rounded-lg hover:border-primary transition-colors">
             <div className="flex items-center gap-3 mb-3">
@@ -253,7 +254,7 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Minimal Quick Actions */}
+        {/* Quick Actions */}
         <div>
           <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
           <div className="grid gap-3 md:grid-cols-2">

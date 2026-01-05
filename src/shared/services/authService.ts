@@ -1,9 +1,7 @@
-/**
- * Servicio de Autenticación para MeDico
- * Maneja todas las operaciones relacionadas con autenticación JWT
- */
-//src/shared/services/authService.ts
+// src/shared/services/authService.ts
+
 import { parseAuthError, NetworkError, TokenRefreshError } from './authErrors';
+import { googleCalendarService } from '@/services/googleCalendarService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const AUTH_ENDPOINTS = {
@@ -83,6 +81,7 @@ const TOKEN_STORAGE_KEYS = {
   access: 'medico_access_token',
   refresh: 'medico_refresh_token',
   user: 'medico_user',
+  lastUserId: 'medico_last_user_id',
 };
 
 class AuthService {
@@ -97,10 +96,20 @@ class AuthService {
   }
 
   /**
-   * Guardar información del usuario en localStorage
+   * 🔒 Guardar información del usuario en localStorage
    */
   private saveUser(user: User): void {
+    const previousUserId = localStorage.getItem(TOKEN_STORAGE_KEYS.lastUserId);
+    const currentUserId = user.id.toString();
+    
+    // Si el usuario cambió, limpiar tokens de Google Calendar
+    if (previousUserId && previousUserId !== currentUserId) {
+      console.log(`🔄 Usuario cambió de ${previousUserId} a ${currentUserId}, limpiando Google Calendar`);
+      googleCalendarService.clearTokens();
+    }
+    
     localStorage.setItem(TOKEN_STORAGE_KEYS.user, JSON.stringify(user));
+    localStorage.setItem(TOKEN_STORAGE_KEYS.lastUserId, currentUserId);
   }
 
   /**
@@ -126,12 +135,19 @@ class AuthService {
   }
 
   /**
-   * Limpiar todos los datos de autenticación
+   * 🔒 Limpiar todos los datos de autenticación
    */
   clearAuth(): void {
+    console.log('🧹 Limpiando todos los datos de autenticación');
+    
+    // Limpiar tokens de autenticación
     localStorage.removeItem(TOKEN_STORAGE_KEYS.access);
     localStorage.removeItem(TOKEN_STORAGE_KEYS.refresh);
     localStorage.removeItem(TOKEN_STORAGE_KEYS.user);
+    localStorage.removeItem(TOKEN_STORAGE_KEYS.lastUserId);
+    
+    // 🔒 CRÍTICO: Limpiar tokens de Google Calendar
+    googleCalendarService.clearTokens();
   }
 
   /**
@@ -174,7 +190,7 @@ class AuthService {
   }
 
   /**
-   * Login de usuario
+   * 🔒 Login de usuario
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
@@ -192,9 +208,11 @@ class AuthService {
 
       const result: AuthResponse = await response.json();
       
-      // Guardar tokens y usuario
+      // Guardar tokens y usuario (esto limpiará Google Calendar si es usuario diferente)
       this.saveTokens(result.tokens);
       this.saveUser(result.user);
+
+      console.log(`✅ Login exitoso para usuario: ${result.user.email}`);
 
       return result;
     } catch (error) {
@@ -206,10 +224,13 @@ class AuthService {
   }
 
   /**
-   * Logout de usuario
+   * 🔒 Logout de usuario
    */
   async logout(): Promise<void> {
     const refreshToken = this.getRefreshToken();
+    const currentUser = this.getCurrentUser();
+    
+    console.log(`🚪 Logout de usuario: ${currentUser?.email || 'unknown'}`);
     
     if (refreshToken) {
       try {
@@ -226,16 +247,16 @@ class AuthService {
       }
     }
 
-    // Limpiar datos locales siempre
+    // 🔒 CRÍTICO: Limpiar TODOS los datos (incluyendo Google Calendar)
     this.clearAuth();
+    
+    console.log('✅ Logout completado');
   }
 
   /**
    * Renovar access token usando refresh token
-   * Implementa lock para prevenir múltiples refreshes simultáneos
    */
   async refreshAccessToken(): Promise<string> {
-    // Si ya hay un refresh en progreso, retornar la misma promesa
     if (this.refreshPromise) {
       return this.refreshPromise;
     }
@@ -246,7 +267,6 @@ class AuthService {
       throw new TokenRefreshError('No refresh token available');
     }
 
-    // Crear y guardar la promesa de refresh
     this.refreshPromise = (async () => {
       try {
         const response = await fetch(AUTH_ENDPOINTS.refresh, {
@@ -329,8 +349,7 @@ class AuthService {
   }
 
   /**
-   * Realizar fetch con autenticación automática (incluye retry con refresh token)
-   * 🔧 FIXED: Detecta FormData y maneja correctamente JSON strings
+   * Realizar fetch con autenticación automática
    */
   async authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
     const accessToken = this.getAccessToken();
@@ -339,26 +358,18 @@ class AuthService {
       throw new Error('No access token available');
     }
 
-    // 🔧 CRITICAL FIX: Preparar headers correctamente según el tipo de body
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${accessToken}`,
       ...(options.headers as Record<string, string>),
     };
 
-    // Preparar el body correctamente
     let bodyToSend = options.body;
 
-    // ⚠️ NO agregar Content-Type si el body es FormData
-    // El navegador lo hace automáticamente con el boundary correcto
     if (options.body instanceof FormData) {
-      // FormData - no hacer nada, dejar que el navegador maneje
-      // NO agregar Content-Type
+      // FormData - no agregar Content-Type
     } else if (options.body) {
-      // Si hay body y NO es FormData, asegurar que es JSON
       headers['Content-Type'] = 'application/json';
       
-      // Si el body ya es string, usarlo directamente
-      // Si es un objeto, convertirlo a string
       if (typeof options.body === 'string') {
         bodyToSend = options.body;
       } else {
@@ -366,25 +377,21 @@ class AuthService {
       }
     }
 
-    // Intentar request con access token actual
     let response = await fetch(url, {
       ...options,
       headers,
       body: bodyToSend,
     });
 
-    // Si es 401, intentar refresh y reintentar
     if (response.status === 401) {
       try {
         const newAccessToken = await this.refreshAccessToken();
         
-        // Preparar headers nuevamente para el retry
         const retryHeaders: Record<string, string> = {
           'Authorization': `Bearer ${newAccessToken}`,
           ...(options.headers as Record<string, string>),
         };
 
-        // Preparar body para retry
         let retryBody = options.body;
         
         if (options.body instanceof FormData) {
@@ -394,7 +401,6 @@ class AuthService {
           retryBody = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
         }
         
-        // Reintentar request con nuevo token
         response = await fetch(url, {
           ...options,
           headers: retryHeaders,
@@ -411,5 +417,4 @@ class AuthService {
   }
 }
 
-// Exportar instancia singleton
 export const authService = new AuthService();
