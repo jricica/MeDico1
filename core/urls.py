@@ -16,8 +16,7 @@ from core.views import (
 urlpatterns = [
     # Django Admin Panel
     path('admin/', admin.site.urls),
-    
-    # API Endpoints - DEBEN IR ANTES DEL CATCH-ALL
+
     path('api/auth/', include('apps.medio_auth.urls')),
     path('api/v1/medico/', include('apps.medico.urls')),
     path('api/v1/communication/', include('apps.communication.urls')),
@@ -43,6 +42,10 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+    urlpatterns += [
+        re_path(r'^.*$', IndexView.as_view(), name='index'),
+    ]
 
 admin.site.site_header = "MéDico1 Administration"
 admin.site.site_title = "MéDico1 Admin Portal"

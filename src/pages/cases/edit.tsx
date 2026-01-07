@@ -101,17 +101,7 @@ const EditCase = () => {
       setSurgeryEndTime(caseData.surgery_end_time || '');
       setDiagnosis(caseData.diagnosis || '');
       setNotes(caseData.notes || '');
-      setStatus(caseData.status || 'scheduled');
-      // Populate assistant doctor
-      if (caseData.assistant_doctor) {
-        setAssistantType('colleague');
-        setSelectedColleagueId(caseData.assistant_doctor);
-      } else if (caseData.assistant_doctor_name) {
-        setAssistantType('manual');
-        setManualAssistantName(caseData.assistant_doctor_name);
-      } else {
-        setAssistantType('none');
-      }
+      setStatus((caseData.status?.toLowerCase?.() || 'scheduled') as import('@/types/surgical-case').CaseStatus);
       
       // Populate procedures
       if (caseData.procedures && caseData.procedures.length > 0) {
@@ -428,6 +418,33 @@ const handleSubmit = async (e: React.FormEvent) => {
     if (notes && notes.trim()) {
       caseData.notes = notes.trim();
     }
+    try {
+      const hospital = hospitals.find(h => h.id === parseInt(hospitalId));
+      const hospitalFactor = hospital?.rate_multiplier || 1;
+      
+      const caseData = {
+        patient_name: patientName,
+        patient_id: patientId || undefined,
+        patient_age: patientAge ? parseInt(patientAge) : undefined,
+        patient_gender: (patientGender || undefined) as PatientGender | undefined,
+        hospital: parseInt(hospitalId),
+        surgery_date: surgeryDate,
+        surgery_time: surgeryTime || undefined,
+        diagnosis: diagnosis || undefined,
+        notes: notes || undefined,
+        status: (status?.toLowerCase?.() as import('@/types/surgical-case').CaseStatus) || 'scheduled',
+        procedures: selectedProcedures.map((proc, index) => ({
+          surgery_code: proc.surgery_code,
+          surgery_name: proc.surgery_name,
+          specialty: proc.specialty,
+          grupo: proc.grupo,
+          rvu: proc.rvu,
+          hospital_factor: hospitalFactor,
+          calculated_value: proc.rvu * hospitalFactor,
+          notes: proc.notes || undefined,
+          order: index + 1
+        }))
+      };
 
     // Manejar médico ayudante
     if (assistantType === 'colleague' && selectedColleagueId) {
