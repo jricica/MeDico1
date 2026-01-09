@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from datetime import timedelta
 from decimal import Decimal
 import os
+import requests
 
 # Importar modelos de medico
 from apps.medico.models import SurgicalCase, CaseProcedure, Hospital, Operation, Specialty
@@ -18,8 +19,7 @@ from apps.medico.models import SurgicalCase, CaseProcedure, Hospital, Operation,
 User = get_user_model()
 
 
-class IndexView(TemplateView):
-import requests
+
 
 class IndexView(View):
     def get(self, request, *args, **kwargs):

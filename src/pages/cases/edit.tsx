@@ -357,94 +357,29 @@ const handleSubmit = async (e: React.FormEvent) => {
     const hospital = hospitals.find(h => h.id === parseInt(hospitalId));
     const hospitalFactor = hospital?.rate_multiplier || 1;
     
-    console.log('Sending case data:', {
-      patient_name: patientName,
-      hospital: parseInt(hospitalId),
-      surgery_date: surgeryDate,
-      procedures: selectedProcedures
-    });
-    
-    // Crear objeto con SOLO los campos necesarios
     const caseData: any = {
       patient_name: patientName,
+      patient_id: patientId || undefined,
+      patient_age: patientAge ? parseInt(patientAge) : undefined,
+      patient_gender: (patientGender || undefined) as PatientGender | undefined,
       hospital: parseInt(hospitalId),
       surgery_date: surgeryDate,
-      status: status || 'scheduled',
-      // Limpiar procedimientos - REMOVER campos undefined/null
-      procedures: selectedProcedures.map((proc, index) => {
-        const cleanProc: any = {
-          surgery_code: proc.surgery_code,
-          surgery_name: proc.surgery_name,
-          specialty: proc.specialty,
-          grupo: proc.grupo || '',
-          rvu: proc.rvu,
-          hospital_factor: hospitalFactor,
-          calculated_value: proc.rvu * hospitalFactor,
-          order: index
-        };
-        
-        // Solo agregar notes si tiene valor
-        if (proc.notes && proc.notes.trim()) {
-          cleanProc.notes = proc.notes.trim();
-        }
-        
-        return cleanProc;
-      })
+      surgery_time: surgeryTime || undefined,
+      diagnosis: diagnosis || undefined,
+      notes: notes || undefined,
+      status: (status?.toLowerCase?.() as import('@/types/surgical-case').CaseStatus) || 'scheduled',
+      procedures: selectedProcedures.map((proc, index) => ({
+        surgery_code: proc.surgery_code,
+        surgery_name: proc.surgery_name,
+        specialty: proc.specialty,
+        grupo: proc.grupo,
+        rvu: proc.rvu,
+        hospital_factor: hospitalFactor,
+        calculated_value: proc.rvu * hospitalFactor,
+        notes: proc.notes || undefined,
+        order: index + 1
+      }))
     };
-
-    // Agregar campos opcionales SOLO si tienen valor
-    if (patientId && patientId.trim()) {
-      caseData.patient_id = patientId.trim();
-    }
-    
-    if (patientAge && patientAge.trim()) {
-      caseData.patient_age = parseInt(patientAge);
-    }
-    
-    if (patientGender) {
-      caseData.patient_gender = patientGender;
-    }
-    
-    if (surgeryTime && surgeryTime.trim()) {
-      caseData.surgery_time = surgeryTime;
-    }
-    if (surgeryEndTime && surgeryEndTime.trim()) {
-      caseData.surgery_end_time = surgeryEndTime;
-    }
-    if (diagnosis && diagnosis.trim()) {
-      caseData.diagnosis = diagnosis.trim();
-    }
-    
-    if (notes && notes.trim()) {
-      caseData.notes = notes.trim();
-    }
-    try {
-      const hospital = hospitals.find(h => h.id === parseInt(hospitalId));
-      const hospitalFactor = hospital?.rate_multiplier || 1;
-      
-      const caseData = {
-        patient_name: patientName,
-        patient_id: patientId || undefined,
-        patient_age: patientAge ? parseInt(patientAge) : undefined,
-        patient_gender: (patientGender || undefined) as PatientGender | undefined,
-        hospital: parseInt(hospitalId),
-        surgery_date: surgeryDate,
-        surgery_time: surgeryTime || undefined,
-        diagnosis: diagnosis || undefined,
-        notes: notes || undefined,
-        status: (status?.toLowerCase?.() as import('@/types/surgical-case').CaseStatus) || 'scheduled',
-        procedures: selectedProcedures.map((proc, index) => ({
-          surgery_code: proc.surgery_code,
-          surgery_name: proc.surgery_name,
-          specialty: proc.specialty,
-          grupo: proc.grupo,
-          rvu: proc.rvu,
-          hospital_factor: hospitalFactor,
-          calculated_value: proc.rvu * hospitalFactor,
-          notes: proc.notes || undefined,
-          order: index + 1
-        }))
-      };
 
     // Manejar médico ayudante
     if (assistantType === 'colleague' && selectedColleagueId) {

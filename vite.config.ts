@@ -29,16 +29,18 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         ws: true,
-        configure: (proxy, _options) => {
-          proxy.on('error', (err, _req, _res) => {
-            console.log('❌ Proxy error:', err);
-          });
-          proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log('➡️  Proxy request:', req.method, req.url, '→ http://localhost:8000' + req.url);
-          });
-          proxy.on('proxyRes', (proxyRes, req, _res) => {
-            console.log('⬅️  Proxy response:', proxyRes.statusCode, req.url);
-          });
+          configure: (proxy) => {
+            proxy.on('error', (err) => {
+              console.log('❌ Proxy error:', err);
+            });
+            proxy.on('proxyReq', (_proxyReq, req) => {
+              // req here is IncomingMessage, so .url is available
+              console.log('➡️  Proxy request:', req.method, req.url, '→ http://localhost:8000' + req.url);
+            });
+            proxy.on('proxyRes', (proxyRes, req) => {
+              // req is IncomingMessage, which has .url
+              console.log('⬅️  Proxy response:', proxyRes.statusCode, req.url);
+            });
         },
       },
     },
